@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Work Zone Intake</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root { --ink:#1a1a1a; --line:#d8d8d2; --accent:#c1440e; --bg:#faf9f6; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; background:var(--bg); color:var(--ink); max-width:640px; margin:40px auto; padding:0 20px; }
+  h1 { font-size:1.4rem; margin-bottom:4px; }
+  p.sub { color:#666; margin-top:0; font-size:0.9rem; }
+  fieldset { border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:16px; }
+  legend { font-weight:600; padding:0 6px; }
+  label { display:block; margin:10px 0 4px; font-size:0.9rem; font-weight:500; }
+  input, select { width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; font-size:0.95rem; }
+  .row { display:flex; gap:12px; }
+  .row > div { flex:1; }
+  .lane-row { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+  .lane-row input, .lane-row select { flex:1; }
+  button { background:var(--accent); color:white; border:none; padding:10px 18px; border-radius:6px; font-size:0.95rem; cursor:pointer; }
+  button.secondary { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  #result { margin-top:16px; padding:12px; border-radius:6px; font-size:0.85rem; white-space:pre-wrap; }
+  #result.ok { background:#e7f3e8; border:1px solid #a9d3ad; }
+  #result.err { background:#fbe9e7; border:1px solid #e3a49c; }
+  .hint { color:#888; font-size:0.8rem; margin-top:2px; }
+
+  #map { height:320px; border-radius:8px; margin-top:10px; border:1px solid var(--line); }
+  .map-toolbar { display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap; }
+  .map-toolbar button { padding:6px 12px; font-size:0.85rem; }
+  .mode-btn { background:transparent; color:var(--ink); border:1px solid var(--line); }
+  .mode-btn.active { background:var(--accent); color:white; border-color:var(--accent); }
+  .coord-readout { display:flex; gap:16px; margin-top:8px; font-size:0.85rem; }
+  .coord-readout span { display:block; color:#666; font-size:0.75rem; }
+  .coord-readout strong { font-variant-numeric:tabular-nums; }
+  .coord-readout .unset { color:#bbb; font-style:italic; font-weight:normal; }
+  .locate-btn { margin-left:auto; }
+</style>
+</head>
+<body>
+  <h1>Work Zone / Hazard Intake</h1>
+  <p class="sub">Reports here publish to the live WZDx feed at <code>/feed</code>.</p>
+
+  <form id="intake">
+    <fieldset>
+      <legend>Location</legend>
+      <label>Road name</label>
+      <input name="road_name" required placeholder="e.g. I-459 N">
+      <label>Direction</label>
+      <select name="direction" required>
+        <option value="northbound">Northbound</option>
+        <option value="southbound">Southbound</option>
+        <option value="eastbound">Eastbound</option>
+        <option value="westbound">Westbound</option>
+      </select>
+      <label>Location method <span class="hint" style="display:inline">(how was extent determined?)</span></label>
+      <select name="location_method">
+        <option value="channel-device-method">Channel devices (cones, barrels)</option>
+        <option value="sign-method">Reference signs</option>
+        <option value="junction-method">Street junction</option>
+        <option value="other">Other</option>
+        <option value="unknown">Unknown</option>
+      </select>
+      <label>Closure extent</label>
+      <div class="map-toolbar">
+        <button type="button" class="mode-btn active" id="modeStart" data-mode="start">📍 Set start point</button>
+        <button type="button" class="mode-btn" id="modeEnd" data-mode="end">🏁 Set end point</button>
+        <button type="button" class="mode-btn locate-btn" id="locateMe">🎯 My location</button>
+      </div>
+      <div id="map"></div>
+      <div class="coord-readout">
+        <div>
+          <span>Start (lng, lat)</span>
+          <strong id="startReadout" class="unset">not set — click the map</strong>
+        </div>
+        <div>
+          <span>End (lng, lat)</span>
+          <strong id="endReadout" class="unset">not set</strong>
+        </div>
+      </div>
+      <p class="hint">Click "Set start point," click the map, then switch to "Set end point" and click again. Drag either pin to fine-tune.</p>
+      <input type="hidden" name="start_lng"><input type="hidden" name="start_lat">
+      <input type="hidden" name="end_lng"><input type="hidden" name="end_lat">
+    </fieldset>
+
+    <fieldset>
+      <legend>Timing</legend>
+      <div class="row">
+        <div>
+          <label>Start date/time</label>
+          <input type="datetime-local" name="start_date" required>
+        </div>
+        <div>
+          <label>End date/time (leave blank if ongoing)</label>
+          <input type="datetime-local" name="end_date">
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Lanes</legend>
+      <label>Total lanes on road at this location
+        <span class="hint" style="display:inline">(required if you fill in lane details below)</span>
+      </label>
+      <input type="number" name="total_lanes" min="1" max="20" placeholder="e.g. 2">
+      <div id="lanes" style="margin-top:10px;"></div>
+      <button type="button" class="secondary" id="addLane">+ Add lane</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Impact</legend>
+      <label>Vehicle impact</label>
+      <select name="vehicle_impact">
+        <option value="all-lanes-open">All lanes open</option>
+        <option value="some-lanes-closed" selected>Some lanes closed</option>
+        <option value="all-lanes-closed">All lanes closed</option>
+        <option value="alternating-one-way">Alternating one-way</option>
+      </select>
+    </fieldset>
+
+    <button type="submit">Publish to feed</button>
+  </form>
+
+  <div id="result" style="display:none;"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+  // ---- Map picker ----
+  // Defaults to Birmingham, AL; falls back gracefully if geolocation is denied.
+  const DEFAULT_CENTER = [33.5186, -86.8104];
+  const map = L.map('map').setView(DEFAULT_CENTER, 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors',
+  }).addTo(map);
+
+  const startIcon = L.divIcon({ className: '', html: '<div style="background:#2e7d32;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
+  const endIcon = L.divIcon({ className: '', html: '<div style="background:#c1440e;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
+
+  let startMarker = null;
+  let endMarker = null;
+  let connector = null;
+  let mode = 'start'; // 'start' | 'end'
+
+  const startLng = document.querySelector('input[name="start_lng"]');
+  const startLat = document.querySelector('input[name="start_lat"]');
+  const endLng = document.querySelector('input[name="end_lng"]');
+  const endLat = document.querySelector('input[name="end_lat"]');
+  const startReadout = document.getElementById('startReadout');
+  const endReadout = document.getElementById('endReadout');
+
+  function fmt(n) { return Number(n).toFixed(6); }
+
+  function updateConnector() {
+    if (connector) { map.removeLayer(connector); connector = null; }
+    if (startMarker && endMarker) {
+      connector = L.polyline([startMarker.getLatLng(), endMarker.getLatLng()], {
+        color: '#c1440e', weight: 3, dashArray: '6 6',
+      }).addTo(map);
+    }
+  }
+
+  function setStart(latlng) {
+    if (!startMarker) {
+      startMarker = L.marker(latlng, { icon: startIcon, draggable: true }).addTo(map);
+      startMarker.on('drag', () => setStart(startMarker.getLatLng()));
+    } else {
+      startMarker.setLatLng(latlng);
+    }
+    startLng.value = latlng.lng; startLat.value = latlng.lat;
+    startReadout.textContent = `${fmt(latlng.lng)}, ${fmt(latlng.lat)}`;
+    startReadout.classList.remove('unset');
+    updateConnector();
+  }
+
+  function setEnd(latlng) {
+    if (!endMarker) {
+      endMarker = L.marker(latlng, { icon: endIcon, draggable: true }).addTo(map);
+      endMarker.on('drag', () => setEnd(endMarker.getLatLng()));
+    } else {
+      endMarker.setLatLng(latlng);
+    }
+    endLng.value = latlng.lng; endLat.value = latlng.lat;
+    endReadout.textContent = `${fmt(latlng.lng)}, ${fmt(latlng.lat)}`;
+    endReadout.classList.remove('unset');
+    updateConnector();
+  }
+
+  map.on('click', (e) => {
+    if (mode === 'start') {
+      setStart(e.latlng);
+      setMode('end'); // auto-advance so the next click sets the end point
+    } else {
+      setEnd(e.latlng);
+    }
+  });
+
+  function setMode(next) {
+    mode = next;
+    document.getElementById('modeStart').classList.toggle('active', mode === 'start');
+    document.getElementById('modeEnd').classList.toggle('active', mode === 'end');
+  }
+  document.getElementById('modeStart').addEventListener('click', () => setMode('start'));
+  document.getElementById('modeEnd').addEventListener('click', () => setMode('end'));
+
+  document.getElementById('locateMe').addEventListener('click', () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 15),
+      () => { /* silently ignore denial — map just stays at default */ }
+    );
+  });
+
+  function coordsAreSet() {
+    return startMarker && endMarker;
+  }
+
+  // ---- Lane rows ----
+  const lanesDiv = document.getElementById('lanes');
+  function addLaneRow() {
+    const n = lanesDiv.children.length + 1;
+    const row = document.createElement('div');
+    row.className = 'lane-row';
+    row.innerHTML = `
+      <input type="number" min="1" value="${n}" data-field="order" placeholder="Lane #">
+      <select data-field="status">
+        <option value="open">Open</option>
+        <option value="closed">Closed</option>
+        <option value="shift-left">Shift left</option>
+        <option value="shift-right">Shift right</option>
+        <option value="merge-left">Merge left</option>
+        <option value="merge-right">Merge right</option>
+      </select>
+      <button type="button" class="secondary" onclick="this.parentElement.remove()">✕</button>
+    `;
+    lanesDiv.appendChild(row);
+  }
+  document.getElementById('addLane').addEventListener('click', addLaneRow);
+  addLaneRow(); addLaneRow();
+
+  document.getElementById('intake').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const resultDiv = document.getElementById('result');
+
+    if (!coordsAreSet()) {
+      resultDiv.style.display = 'block';
+      resultDiv.className = 'err';
+      resultDiv.textContent = 'Drop both a start and end point on the map before publishing.';
+      return;
+    }
+
+    const lanes = [...lanesDiv.children].map((row) => ({
+      order: Number(row.querySelector('[data-field="order"]').value),
+      status: row.querySelector('[data-field="status"]').value,
+    }));
+
+    const totalLanesRaw = f.total_lanes.value;
+    const payload = {
+      road_name: f.road_name.value,
+      direction: f.direction.value,
+      location_method: f.location_method.value,
+      start_coords: [Number(f.start_lng.value), Number(f.start_lat.value)],
+      end_coords: [Number(f.end_lng.value), Number(f.end_lat.value)],
+      start_date: f.start_date.value ? new Date(f.start_date.value).toISOString() : null,
+      end_date: f.end_date.value ? new Date(f.end_date.value).toISOString() : null,
+      total_lanes: totalLanesRaw ? Number(totalLanesRaw) : undefined,
+      lanes,
+      vehicle_impact: f.vehicle_impact.value,
+    };
+
+    try {
+      const res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      resultDiv.style.display = 'block';
+      if (res.ok) {
+        resultDiv.className = 'ok';
+        resultDiv.textContent = 'Published. Event ID: ' + data.id + '\nView feed at /feed';
+        f.reset();
+        lanesDiv.innerHTML = '';
+        addLaneRow(); addLaneRow();
+        if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
+        if (endMarker) { map.removeLayer(endMarker); endMarker = null; }
+        if (connector) { map.removeLayer(connector); connector = null; }
+        startReadout.textContent = 'not set — click the map'; startReadout.classList.add('unset');
+        endReadout.textContent = 'not set'; endReadout.classList.add('unset');
+        setMode('start');
+      } else {
+        resultDiv.className = 'err';
+        resultDiv.textContent = 'Errors:\n' + (data.errors || []).join('\n');
+      }
+    } catch (err) {
+      resultDiv.style.display = 'block';
+      resultDiv.className = 'err';
+      resultDiv.textContent = 'Request failed: ' + err.message;
+    }
+  });
+</script>
+</body>
+</html>

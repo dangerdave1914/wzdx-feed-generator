@@ -1,0 +1,18 @@
+{
+  "name": "wzdx-feed-generator",
+  "version": "0.1.0",
+  "description": "Lightweight WZDx v4.2 compliant work-zone/hazard feed generator — crew intake form to GeoJSON feed",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "better-sqlite3": "^13.0.1",
+    "express": "^4.19.2",
+    "uuid": "^9.0.1"
+  },
+  "license": "UNLICENSED"
+}
