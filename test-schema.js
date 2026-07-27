@@ -31,7 +31,10 @@ function loadSchema(filename) {
 }
 
 async function main() {
-  const ajv = new Ajv({ strict: false });
+  // formats: true tells AJV to accept but not enforce format keywords (email,
+  // date-time, uri) — suppresses the "unknown format ignored" warnings while
+  // still validating structure.
+  const ajv = new Ajv({ strict: false, formats: { email: true, 'date-time': true, uri: true } });
 
   // Register all local schemas so $ref resolution uses local copies.
   const schemaFiles = [
