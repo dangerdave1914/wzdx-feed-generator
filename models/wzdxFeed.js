@@ -12,6 +12,12 @@
 // (feed_info, core details, geometry, lanes) plus the optional fields
 // we actually populate: types_of_work, reduced_speed_limit_kph.
 
+// Configurable retention window: after an event's end_date passes, it stays
+// in the feed for this long so downstream consumers have time to process the
+// closure before the event disappears. Default: 60 minutes.
+// The WZDx spec does not mandate a specific window — this is our own policy.
+const FEED_RETENTION_MS = (parseInt(process.env.FEED_RETENTION_MINUTES, 10) || 60) * 60 * 1000;
+
 const FEED_PUBLISHER = {
   publisher:     process.env.WZDX_PUBLISHER     || 'Independent Work Zone Feed (pilot)',
   contact_name:  process.env.WZDX_CONTACT_NAME  || 'David Clark',
@@ -128,9 +134,15 @@ function eventToFeature(event) {
 }
 
 function buildWorkZoneFeed(events) {
-  const publishable = events.filter(
-    (e) => !UNPUBLISHED_TYPES.has(e.obstruction_type)
-  );
+  const now = Date.now();
+  const publishable = events.filter((e) => {
+    if (UNPUBLISHED_TYPES.has(e.obstruction_type)) return false;
+    if (e.end_date) {
+      const endMs = new Date(e.end_date).getTime();
+      if (now > endMs + FEED_RETENTION_MS) return false; // past retention window
+    }
+    return true;
+  });
   return {
     feed_info: buildFeedInfo(),
     type:      'FeatureCollection',

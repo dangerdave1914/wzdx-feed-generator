@@ -69,6 +69,7 @@ See `.env.example` for the full list. Key ones:
 | `WZDX_CONTACT_NAME` | Contact name in feed_info |
 | `WZDX_CONTACT_EMAIL` | Contact email in feed_info |
 | `PORT` | Server port (default: 3000) |
+| `FEED_RETENTION_MINUTES` | Minutes a closed event stays in `/feed` after `end_date` passes (default: 60) |
 
 ## What's verified working
 
@@ -105,26 +106,21 @@ See `.env.example` for the full list. Key ones:
 - Incident filtering, types_of_work mapping, end_date estimation all covered
   by the same test assertions as the rest of the feed
 
-**Field capture — browser UI (mixed — see below)**
-Real device testing was performed. GPS marker drop, map rendering, and the
-incident type selector were confirmed working. Two bugs were found and fixed:
+**Field capture — browser UI (device-tested and confirmed)**
+Full end-to-end flow confirmed on real device (GPS, ngrok HTTPS, API key auth — Event ID `cec50aca...` published live). Specific fixes confirmed working:
 
-- Geolocation denial message persisted on screen even after permission was
-  granted — fixed by clearing it on successful marker drop and by not
-  triggering the OS permission dialog at page load (uses `permissions.query`
-  first so Android doesn't cache a denial before the user taps Drop Marker)
-- Both incident-type buttons appeared visually selected simultaneously when
-  one was active — fixed; was a CSS specificity issue, JS state was always
-  correct
+- Geolocation denial message cleared on successful marker drop
+- `permissions.query` prevents OS dialog at page load (no cached Android denial)
+- `perm.onchange` clears denial banner when permission granted mid-session
+- Retry link re-triggers Drop Marker without page reload
+- Incident type selector shows/hides notice correctly
+- Undo removes last marker and redraws polyline
+- OSM Overpass prefill populates lanes/speed on first marker drop
 
-The following fixes are code-reviewed but **not yet re-verified on device**:
-- Geolocation permission flow (the new `permissions.query` path + Retry link)
-- `perm.onchange` clearing the denial banner when permission granted mid-session
-
-The following have **not been device-tested at all**:
-- Undo behavior
-- OSM Overpass prefill on first marker
-- Full submit-to-server flow from the mobile UI
+**Event lifecycle**
+- `PATCH /api/events/:id/close` marks an event ended (sets `end_date` to now)
+- `GET /index.html` ("Mark event complete" panel) — loads active events, shows road name + direction + start time, closes selected event with one tap; requires same API key as other write operations
+- `GET /feed` retention: closed events remain in the feed for 60 minutes after `end_date` passes, then drop. Window is configurable via `FEED_RETENTION_MINUTES` env var. The WZDx spec does not mandate a specific retention window — this is our operational policy.
 
 ## Merge Advisory (value-add, separate from WZDx feed)
 
@@ -190,9 +186,6 @@ A = taper start → Sign 1 (nearest), B = Sign 1 → Sign 2, C = Sign 2 → Sign
   address/road search-to-center and no snapping to road centerlines. The OSM
   tile server (`tile.openstreetmap.org`) is dev-only — swap to a paid tile
   provider (Mapbox, MapTiler, etc.) before production traffic.
-- **Event lifecycle UI** — `PATCH /api/events/:id/close` exists but there's no
-  UI for it. The WZDx recommendation that a closed event stay in the feed for
-  at least an hour after closing is also not implemented.
 - **Detours, restrictions, worker-presence** — this implements only the required
   subset for a valid WorkZoneFeed. The spec supports more.
 - **Incident feed** — `traffic-incident` and `accident-ems` events have no
