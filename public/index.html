@@ -119,6 +119,13 @@
       </select>
     </fieldset>
 
+    <div style="margin-bottom:14px;">
+      <button type="button" id="apiKeyToggle" style="background:none;border:none;padding:0;color:#888;font-size:0.82rem;cursor:pointer;text-decoration:underline;">🔑 API key</button>
+      <div id="apiKeyPanel" style="display:none;margin-top:8px;">
+        <input type="password" id="apiKeyInput" autocomplete="off" placeholder="Paste key here" style="font-family:monospace;">
+        <p class="hint">Saved in this browser — won't need to be re-entered.</p>
+      </div>
+    </div>
     <button type="submit">Publish to feed</button>
   </form>
 
@@ -239,6 +246,19 @@
   document.getElementById('addLane').addEventListener('click', addLaneRow);
   addLaneRow(); addLaneRow();
 
+  // ---- API key (localStorage) ----
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  apiKeyInput.value = localStorage.getItem('wzdx_api_key') || '';
+  apiKeyInput.addEventListener('change', () => {
+    const v = apiKeyInput.value.trim();
+    if (v) localStorage.setItem('wzdx_api_key', v);
+    else localStorage.removeItem('wzdx_api_key');
+  });
+  document.getElementById('apiKeyToggle').addEventListener('click', () => {
+    const p = document.getElementById('apiKeyPanel');
+    p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  });
+
   document.getElementById('intake').addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target;
@@ -271,9 +291,12 @@
     };
 
     try {
+      const apiKey = localStorage.getItem('wzdx_api_key') || '';
+      const headers = { 'Content-Type': 'application/json' };
+      if (apiKey) headers['X-Api-Key'] = apiKey;
       const res = await fetch('/api/events', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
       const data = await res.json();
@@ -290,6 +313,10 @@
         startReadout.textContent = 'not set — click the map'; startReadout.classList.add('unset');
         endReadout.textContent = 'not set'; endReadout.classList.add('unset');
         setMode('start');
+      } else if (res.status === 401) {
+        resultDiv.className = 'err';
+        resultDiv.textContent = 'API key required — click "\uD83D\uDD11 API key" above to enter your key.';
+        document.getElementById('apiKeyPanel').style.display = 'block';
       } else {
         resultDiv.className = 'err';
         resultDiv.textContent = 'Errors:\n' + (data.errors || []).join('\n');

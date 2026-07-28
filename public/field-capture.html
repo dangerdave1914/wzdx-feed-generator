@@ -183,6 +183,13 @@
   <p class="hint" style="margin-top:10px;">Drop at least 3 markers to enable publish.</p>
 </section>
 
+<div style="padding:0 20px 10px;">
+  <button type="button" id="apiKeyToggle" style="background:none;border:none;padding:0;color:#888;font-size:0.82rem;cursor:pointer;text-decoration:underline;">🔑 API key</button>
+  <div id="apiKeyPanel" style="display:none;margin-top:8px;">
+    <input type="password" id="apiKeyInput" autocomplete="off" placeholder="Paste key here" style="font-family:monospace;width:100%;padding:9px 10px;border:1px solid #d8d8d2;border-radius:6px;font-size:0.95rem;background:white;">
+    <p style="color:#888;font-size:0.78rem;margin-top:3px;">Saved in this browser — won't need to be re-entered.</p>
+  </div>
+</div>
 <button id="publish-btn" type="button" disabled>Publish to Feed</button>
 <div id="result"></div>
 
@@ -410,6 +417,19 @@ function parseMaxspeedToKph(maxspeed) {
   return null; // "national", "urban", "rural" — ignore
 }
 
+// ── API key (localStorage) ─────────────────────────────────────────────────
+const apiKeyInput = document.getElementById('apiKeyInput');
+apiKeyInput.value = localStorage.getItem('wzdx_api_key') || '';
+apiKeyInput.addEventListener('change', () => {
+  const v = apiKeyInput.value.trim();
+  if (v) localStorage.setItem('wzdx_api_key', v);
+  else localStorage.removeItem('wzdx_api_key');
+});
+document.getElementById('apiKeyToggle').addEventListener('click', () => {
+  const p = document.getElementById('apiKeyPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+});
+
 // ── Publish ────────────────────────────────────────────────────────────────
 function updatePublishState() {
   const ready = markers.length >= 3 && document.getElementById('road_name').value.trim();
@@ -441,9 +461,12 @@ document.getElementById('publish-btn').addEventListener('click', async () => {
   if (speedRaw)      payload.reduced_speed_limit_kph = Number(speedRaw);
 
   try {
+    const apiKey = localStorage.getItem('wzdx_api_key') || '';
+    const headers = { 'Content-Type': 'application/json' };
+    if (apiKey) headers['X-Api-Key'] = apiKey;
     const res  = await fetch('/api/events', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body:    JSON.stringify(payload),
     });
     const data = await res.json();
@@ -457,6 +480,9 @@ document.getElementById('publish-btn').addEventListener('click', async () => {
           : 'Published to /feed.')
       );
       resetForm();
+    } else if (res.status === 401) {
+      showResult('err', 'API key required — tap "\uD83D\uDD11 API key" above to enter your key.');
+      document.getElementById('apiKeyPanel').style.display = 'block';
     } else {
       showResult('err', 'Errors:\n' + (data.errors || [data.error]).join('\n'));
     }
