@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Field Capture</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root { --ink:#1a1a1a; --line:#d8d8d2; --accent:#c1440e; --green:#2e7d32; --bg:#faf9f6; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; background:var(--bg); color:var(--ink); max-width:640px; margin:0 auto; }
+
+  .page-header { padding:14px 20px 10px; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:16px; }
+  .page-header h1 { font-size:1.2rem; }
+  .page-header a { font-size:0.82rem; color:#888; text-decoration:none; white-space:nowrap; }
+
+  section { padding:14px 20px; border-bottom:1px solid var(--line); }
+  .section-title { font-weight:600; font-size:0.9rem; margin-bottom:10px; display:block; }
+  label { display:block; margin:10px 0 4px; font-size:0.88rem; font-weight:500; }
+  label .req { color:var(--accent); }
+  input, select { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:6px; font-size:0.95rem; background:white; }
+  .hint { color:#888; font-size:0.78rem; margin-top:3px; }
+  .row { display:flex; gap:12px; }
+  .row > div { flex:1; }
+
+  /* Obstruction type grid */
+  .type-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .type-btn {
+    padding:12px 8px; border:1px solid var(--line); border-radius:8px;
+    background:white; font-size:0.83rem; cursor:pointer; text-align:center;
+    line-height:1.35; color:var(--ink);
+  }
+  .type-btn.active { background:var(--accent); color:white; border-color:var(--accent); }
+  .type-btn.incident-type { border-color:#c09000; color:#7a5800; }
+  .type-btn.incident-type.active { background:#b08800; color:white; border-color:#b08800; }
+
+  .incident-notice {
+    display:none; margin-top:10px;
+    background:#fef9e7; border:1px solid #e8c840; border-radius:6px;
+    padding:10px 12px; font-size:0.82rem; color:#7a5800; line-height:1.45;
+  }
+
+  /* Duration toggle */
+  .dur-row { display:flex; gap:8px; margin-top:12px; }
+  .dur-btn {
+    flex:1; padding:9px 8px; border:1px solid var(--line); border-radius:6px;
+    background:white; font-size:0.83rem; cursor:pointer; color:var(--ink);
+  }
+  .dur-btn.active { background:var(--ink); color:white; border-color:var(--ink); }
+
+  /* Map */
+  #map { height:300px; width:100%; display:block; }
+
+  /* Status bar */
+  .status-bar {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 20px; background:#f0efeb; border-bottom:1px solid var(--line);
+    font-size:0.85rem; min-height:36px;
+  }
+  #marker-count { font-weight:600; }
+  #accuracy-display { color:#555; font-size:0.8rem; }
+
+  /* Action buttons — large, thumb-friendly */
+  .action-row { display:flex; gap:10px; padding:14px 20px; }
+  #drop-btn {
+    flex:3; padding:20px 12px; font-size:1.05rem; font-weight:700;
+    background:var(--green); color:white; border:none; border-radius:10px;
+    cursor:pointer; letter-spacing:0.01em; touch-action:manipulation;
+  }
+  #drop-btn:active { background:#1b5e20; }
+  #drop-btn:disabled { background:#aaa; cursor:not-allowed; }
+  #undo-btn {
+    flex:1; padding:20px 8px; font-size:0.88rem;
+    background:white; color:var(--ink); border:1px solid var(--line);
+    border-radius:10px; cursor:pointer; touch-action:manipulation;
+  }
+  #undo-btn:disabled { color:#ccc; border-color:#e4e4de; cursor:not-allowed; }
+
+  /* OSM suggestion tag */
+  .osm-note { font-size:0.75rem; color:#2563eb; margin-top:3px; display:none; }
+
+  /* Publish */
+  #publish-btn {
+    display:block; width:calc(100% - 40px); margin:4px 20px 20px;
+    padding:15px; font-size:1rem; font-weight:600;
+    background:var(--accent); color:white; border:none; border-radius:8px;
+    cursor:pointer; touch-action:manipulation;
+  }
+  #publish-btn:disabled { background:#aaa; cursor:not-allowed; }
+
+  #result {
+    margin:0 20px 24px; padding:12px; border-radius:6px;
+    font-size:0.85rem; white-space:pre-wrap; display:none;
+  }
+  #result.ok  { background:#e7f3e8; border:1px solid #a9d3ad; }
+  #result.err { background:#fbe9e7; border:1px solid #e3a49c; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Field Capture</h1>
+  <a href="/">← Intake form</a>
+</div>
+
+<!-- ── Event type ─────────────────────────────────────────────── -->
+<section>
+  <span class="section-title">Event type</span>
+  <div class="type-grid">
+    <button type="button" class="type-btn active"       data-type="construction">🚧 Construction</button>
+    <button type="button" class="type-btn"              data-type="road-maintenance">🔧 Road Maintenance</button>
+    <button type="button" class="type-btn incident-type" data-type="traffic-incident">🚦 Traffic Incident</button>
+    <button type="button" class="type-btn incident-type" data-type="accident-ems">🚑 Accident / EMS</button>
+  </div>
+  <div class="incident-notice" id="incident-notice">
+    ⚠️ Traffic incidents and EMS responses are saved to your records but are
+    <strong>not published</strong> to the public WZDx feed — that feed is
+    scoped to planned work zones only.
+  </div>
+  <div class="dur-row">
+    <button type="button" class="dur-btn active" data-dur="short-term">Short-term (&le;1 day)</button>
+    <button type="button" class="dur-btn"        data-dur="long-term">Long-term (multi-day)</button>
+  </div>
+</section>
+
+<!-- ── Road ────────────────────────────────────────────────────── -->
+<section>
+  <span class="section-title">Road</span>
+  <label>Road name <span class="req">*</span></label>
+  <input id="road_name" type="text" placeholder="e.g. Oak Street" autocomplete="off" autocorrect="off">
+  <label>Direction <span class="req">*</span></label>
+  <select id="direction">
+    <option value="northbound">Northbound</option>
+    <option value="southbound">Southbound</option>
+    <option value="eastbound">Eastbound</option>
+    <option value="westbound">Westbound</option>
+  </select>
+</section>
+
+<!-- ── Map ─────────────────────────────────────────────────────── -->
+<div id="map"></div>
+
+<div class="status-bar">
+  <span id="marker-count">0 markers placed</span>
+  <span id="accuracy-display"></span>
+</div>
+
+<div class="action-row">
+  <button id="drop-btn" type="button">📍 Drop Marker</button>
+  <button id="undo-btn" type="button" disabled>↩ Undo</button>
+</div>
+
+<!-- ── Details ─────────────────────────────────────────────────── -->
+<section>
+  <span class="section-title">Details</span>
+  <div class="row">
+    <div>
+      <label>Total lanes on road</label>
+      <input id="total_lanes" type="number" min="1" max="20" placeholder="e.g. 2">
+      <div class="osm-note" id="lanes-osm-note">from OpenStreetMap — verify before submitting</div>
+    </div>
+    <div>
+      <label>Reduced speed limit (km/h)</label>
+      <input id="speed_kph" type="number" min="0" max="300" placeholder="optional">
+      <div class="osm-note" id="speed-osm-note">from OpenStreetMap — verify before submitting</div>
+    </div>
+  </div>
+  <label>Location method</label>
+  <select id="location_method">
+    <option value="channel-device-method">Channel devices (cones, barrels)</option>
+    <option value="sign-method">Reference signs</option>
+    <option value="junction-method">Street junction</option>
+    <option value="other">Other</option>
+    <option value="unknown">Unknown</option>
+  </select>
+  <label>Vehicle impact</label>
+  <select id="vehicle_impact">
+    <option value="all-lanes-open">All lanes open</option>
+    <option value="some-lanes-closed" selected>Some lanes closed</option>
+    <option value="all-lanes-closed">All lanes closed</option>
+    <option value="alternating-one-way">Alternating one-way</option>
+  </select>
+  <p class="hint" style="margin-top:10px;">Drop at least 3 markers to enable publish.</p>
+</section>
+
+<button id="publish-btn" type="button" disabled>Publish to Feed</button>
+<div id="result"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let markers      = [];   // [{ latlng, leafletMarker, accuracyCircle }]
+let polyline     = null;
+let obstructionType = 'construction';
+let durationType    = 'short-term';
+let osmQueried   = false;
+
+// ── Map setup ──────────────────────────────────────────────────────────────
+const DEFAULT_CENTER = [33.5186, -86.8104];
+const map = L.map('map', { zoomControl: true }).setView(DEFAULT_CENTER, 14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; OpenStreetMap contributors',
+}).addTo(map);
+
+// Best-effort center on user position without blocking
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 16),
+    () => {}
+  );
+}
+
+function makeMarkerIcon(n) {
+  // Numbered circle icon — hardcoded color, CSS vars don't work in divIcon HTML
+  return L.divIcon({
+    className: '',
+    html: `<div style="background:#c1440e;color:white;width:26px;height:26px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:sans-serif">${n}</div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  });
+}
+
+function redrawPolyline() {
+  if (polyline) { map.removeLayer(polyline); polyline = null; }
+  if (markers.length >= 2) {
+    polyline = L.polyline(markers.map(m => m.latlng), {
+      color: '#c1440e', weight: 3, opacity: 0.85,
+    }).addTo(map);
+  }
+}
+
+// ── Type / duration selectors ──────────────────────────────────────────────
+document.querySelectorAll('.type-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    obstructionType = btn.dataset.type;
+    const isIncident = obstructionType === 'traffic-incident' || obstructionType === 'accident-ems';
+    document.getElementById('incident-notice').style.display = isIncident ? 'block' : 'none';
+    updatePublishState();
+  });
+});
+
+document.querySelectorAll('.dur-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    durationType = btn.dataset.dur;
+  });
+});
+
+// ── Drop marker ────────────────────────────────────────────────────────────
+document.getElementById('drop-btn').addEventListener('click', () => {
+  if (!navigator.geolocation) {
+    showResult('err', 'Geolocation is not available on this device.');
+    return;
+  }
+
+  const btn = document.getElementById('drop-btn');
+  btn.disabled = true;
+  btn.textContent = '⌛ Getting GPS…';
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const latlng   = L.latLng(pos.coords.latitude, pos.coords.longitude);
+      const accuracy = pos.coords.accuracy; // metres
+
+      const n = markers.length + 1;
+      const leafletMarker = L.marker(latlng, { icon: makeMarkerIcon(n) }).addTo(map);
+      const accuracyCircle = L.circle(latlng, {
+        radius:      accuracy,
+        color:       '#2563eb',
+        fillColor:   '#93c5fd',
+        fillOpacity: 0.18,
+        weight:      1,
+      }).addTo(map);
+
+      markers.push({ latlng, leafletMarker, accuracyCircle });
+      redrawPolyline();
+
+      document.getElementById('marker-count').textContent =
+        `${markers.length} marker${markers.length !== 1 ? 's' : ''} placed`;
+      document.getElementById('accuracy-display').textContent =
+        `±${Math.round(accuracy)} m`;
+
+      map.panTo(latlng);
+      document.getElementById('undo-btn').disabled = false;
+      updatePublishState();
+
+      btn.disabled = false;
+      btn.textContent = '📍 Drop Marker';
+
+      // OSM lookup fires once on first marker only
+      if (!osmQueried) {
+        osmQueried = true;
+        queryOSM(pos.coords.latitude, pos.coords.longitude);
+      }
+    },
+    (err) => {
+      const msgs = {
+        1: 'Location access denied — enable location permissions to use field capture.',
+        2: 'Location unavailable — move to an area with better GPS signal and try again.',
+        3: 'Location request timed out — try again.',
+      };
+      showResult('err', msgs[err.code] || `Location error (code ${err.code}).`);
+      btn.disabled = false;
+      btn.textContent = '📍 Drop Marker';
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+});
+
+// ── Undo ───────────────────────────────────────────────────────────────────
+document.getElementById('undo-btn').addEventListener('click', () => {
+  if (!markers.length) return;
+  const last = markers.pop();
+  map.removeLayer(last.leafletMarker);
+  map.removeLayer(last.accuracyCircle);
+  redrawPolyline();
+  document.getElementById('marker-count').textContent =
+    `${markers.length} marker${markers.length !== 1 ? 's' : ''} placed`;
+  if (!markers.length) {
+    document.getElementById('accuracy-display').textContent = '';
+    document.getElementById('undo-btn').disabled = true;
+  }
+  updatePublishState();
+});
+
+// ── OSM Overpass lookup ────────────────────────────────────────────────────
+// Queries once per session on first marker drop. Fails silently on any error.
+async function queryOSM(lat, lng) {
+  const query =
+    `[out:json][timeout:10];` +
+    `way(around:50,${lat},${lng})` +
+    `[highway~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|` +
+    `motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$"];` +
+    `out tags 1;`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+
+  try {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    'data=' + encodeURIComponent(query),
+      signal:  controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const tags = data.elements?.[0]?.tags;
+    if (!tags) return;
+
+    if (tags.lanes && !document.getElementById('total_lanes').value) {
+      const n = parseInt(tags.lanes, 10);
+      if (!isNaN(n) && n > 0) {
+        document.getElementById('total_lanes').value = n;
+        document.getElementById('lanes-osm-note').style.display = 'block';
+      }
+    }
+
+    if (tags.maxspeed && !document.getElementById('speed_kph').value) {
+      const kph = parseMaxspeedToKph(tags.maxspeed);
+      if (kph !== null) {
+        document.getElementById('speed_kph').value = kph;
+        document.getElementById('speed-osm-note').style.display = 'block';
+      }
+    }
+  } catch (_) {
+    clearTimeout(timer);
+    // Silently ignore — crew fills in manually
+  }
+}
+
+function parseMaxspeedToKph(maxspeed) {
+  const mphMatch = maxspeed.match(/^(\d+(?:\.\d+)?)\s*mph$/i);
+  if (mphMatch) return Math.round(parseFloat(mphMatch[1]) * 1.60934);
+  const numMatch = maxspeed.match(/^(\d+(?:\.\d+)?)(?:\s*km\/h)?$/i);
+  if (numMatch) return parseInt(numMatch[1], 10);
+  return null; // "national", "urban", "rural" — ignore
+}
+
+// ── Publish ────────────────────────────────────────────────────────────────
+function updatePublishState() {
+  const ready = markers.length >= 3 && document.getElementById('road_name').value.trim();
+  document.getElementById('publish-btn').disabled = !ready;
+}
+
+document.getElementById('road_name').addEventListener('input', updatePublishState);
+
+document.getElementById('publish-btn').addEventListener('click', async () => {
+  const roadName = document.getElementById('road_name').value.trim();
+  if (!roadName) { showResult('err', 'Road name is required.'); return; }
+  if (markers.length < 3) { showResult('err', 'Drop at least 3 markers to define the perimeter.'); return; }
+
+  const totalLanesRaw = document.getElementById('total_lanes').value;
+  const speedRaw      = document.getElementById('speed_kph').value;
+
+  const payload = {
+    road_name:        roadName,
+    direction:        document.getElementById('direction').value,
+    obstruction_type: obstructionType,
+    duration_type:    durationType,
+    perimeter_points: markers.map(m => [m.latlng.lng, m.latlng.lat]),
+    start_date:       new Date().toISOString(),
+    vehicle_impact:   document.getElementById('vehicle_impact').value,
+    location_method:  document.getElementById('location_method').value,
+  };
+
+  if (totalLanesRaw) payload.total_lanes            = Number(totalLanesRaw);
+  if (speedRaw)      payload.reduced_speed_limit_kph = Number(speedRaw);
+
+  try {
+    const res  = await fetch('/api/events', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      const isIncident = obstructionType === 'traffic-incident' || obstructionType === 'accident-ems';
+      showResult('ok',
+        `Saved. Event ID: ${data.id}\n` +
+        (isIncident
+          ? 'Stored internally — not published to the WZDx feed.'
+          : 'Published to /feed.')
+      );
+      resetForm();
+    } else {
+      showResult('err', 'Errors:\n' + (data.errors || [data.error]).join('\n'));
+    }
+  } catch (err) {
+    showResult('err', 'Request failed: ' + err.message);
+  }
+});
+
+function resetForm() {
+  markers.forEach(m => {
+    map.removeLayer(m.leafletMarker);
+    map.removeLayer(m.accuracyCircle);
+  });
+  markers = [];
+  if (polyline) { map.removeLayer(polyline); polyline = null; }
+
+  document.getElementById('marker-count').textContent   = '0 markers placed';
+  document.getElementById('accuracy-display').textContent = '';
+  document.getElementById('undo-btn').disabled           = true;
+  document.getElementById('road_name').value             = '';
+  document.getElementById('total_lanes').value           = '';
+  document.getElementById('speed_kph').value             = '';
+  document.getElementById('lanes-osm-note').style.display = 'none';
+  document.getElementById('speed-osm-note').style.display = 'none';
+  osmQueried = false;
+  updatePublishState();
+}
+
+function showResult(cls, msg) {
+  const el = document.getElementById('result');
+  el.style.display = 'block';
+  el.className = cls;
+  el.textContent = msg;
+}
+</script>
+</body>
+</html>

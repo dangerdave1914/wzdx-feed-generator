@@ -148,10 +148,129 @@ async function main() {
   res = await request('GET', '/feed');
   assertValid(validate, res.body, 'feed with open-ended event');
 
+  // ── Test 4: perimeter_points geometry (field-capture mode) ─────────────
+  const perim = await request('POST', '/api/events', {
+    road_name:        'Oak Street',
+    direction:        'northbound',
+    obstruction_type: 'construction',
+    duration_type:    'short-term',
+    perimeter_points: [
+      [-86.800, 33.510],
+      [-86.799, 33.512],
+      [-86.797, 33.513],
+      [-86.796, 33.511],
+      [-86.798, 33.509],
+    ],
+    start_date:              '2026-07-28T07:00:00Z',
+    vehicle_impact:          'some-lanes-closed',
+    location_method:         'channel-device-method',
+    total_lanes:             2,
+    reduced_speed_limit_kph: 40,
+  });
+
+  if (perim.status !== 201) {
+    console.error('FAIL [perimeter event]: expected 201, got', perim.status, perim.body);
+    process.exit(1);
+  }
+  const perimId = perim.body.id;
+  console.log(`PASS [perimeter event]: created ${perimId}`);
+
+  res = await request('GET', '/feed');
+  assertValid(validate, res.body, 'feed with perimeter event');
+
+  const perimFeature = res.body.features.find((f) => f.id === perimId);
+  if (!perimFeature) {
+    console.error('FAIL [perimeter feature in feed]: not found');
+    process.exit(1);
+  }
+  const coords = perimFeature.geometry.coordinates;
+  if (coords.length !== 5) {
+    console.error(`FAIL [perimeter geometry]: expected 5 coords, got ${coords.length}`);
+    process.exit(1);
+  }
+  const tow = perimFeature.properties.types_of_work;
+  if (!tow || tow[0].type_name !== 'surface-work') {
+    console.error('FAIL [types_of_work]: expected surface-work, got', tow);
+    process.exit(1);
+  }
+  if (perimFeature.properties.reduced_speed_limit_kph !== 40) {
+    console.error('FAIL [reduced_speed_limit_kph]: expected 40');
+    process.exit(1);
+  }
+  console.log(`PASS [perimeter feature]: 5-point LineString, types_of_work=surface-work, speed limit 40 kph`);
+
+  // ── Test 5: incident event — saved internally, NOT in public feed ────────
+  const incident = await request('POST', '/api/events', {
+    road_name:        'I-65',
+    direction:        'southbound',
+    obstruction_type: 'traffic-incident',
+    start_coords:     [-86.810, 33.500],
+    end_coords:       [-86.812, 33.500],
+    start_date:       '2026-07-28T09:00:00Z',
+    vehicle_impact:   'all-lanes-closed',
+    location_method:  'channel-device-method',
+  });
+
+  if (incident.status !== 201) {
+    console.error('FAIL [incident event]: expected 201, got', incident.status, incident.body);
+    process.exit(1);
+  }
+  const incidentId = incident.body.id;
+  console.log(`PASS [incident event]: created ${incidentId} (traffic-incident)`);
+
+  res = await request('GET', '/feed');
+  assertValid(validate, res.body, 'feed after incident posted');
+
+  if (res.body.features.some((f) => f.id === incidentId)) {
+    console.error('FAIL [incident filtered]: traffic-incident should not appear in public feed');
+    process.exit(1);
+  }
+  console.log(`PASS [incident filtered]: traffic-incident is NOT in public feed`);
+
+  // ── Test 6: long-term event — road-maintenance, estimated end 7 days ────
+  const longTerm = await request('POST', '/api/events', {
+    road_name:        'US-280',
+    direction:        'eastbound',
+    obstruction_type: 'road-maintenance',
+    duration_type:    'long-term',
+    start_coords:     [-86.820, 33.490],
+    end_coords:       [-86.818, 33.491],
+    start_date:       '2026-07-28T06:00:00Z',
+    vehicle_impact:   'some-lanes-closed',
+    location_method:  'sign-method',
+  });
+
+  if (longTerm.status !== 201) {
+    console.error('FAIL [long-term event]: expected 201, got', longTerm.status, longTerm.body);
+    process.exit(1);
+  }
+  const ltId = longTerm.body.id;
+  console.log(`PASS [long-term event]: created ${ltId}`);
+
+  res = await request('GET', '/feed');
+  assertValid(validate, res.body, 'feed with long-term event');
+
+  const ltFeature = res.body.features.find((f) => f.id === ltId);
+  const estEnd = new Date(ltFeature.properties.end_date);
+  const start  = new Date('2026-07-28T06:00:00Z');
+  const diffDays = (estEnd - start) / (1000 * 60 * 60 * 24);
+  if (diffDays < 6.9 || diffDays > 7.1) {
+    console.error(`FAIL [long-term end_date]: expected ~7 days, got ${diffDays.toFixed(2)} days`);
+    process.exit(1);
+  }
+  const ltTow = ltFeature.properties.types_of_work;
+  if (!ltTow || ltTow[0].type_name !== 'maintenance') {
+    console.error('FAIL [long-term types_of_work]: expected maintenance, got', ltTow);
+    process.exit(1);
+  }
+  console.log(`PASS [long-term end_date]: estimated end is ${diffDays.toFixed(1)} days out, types_of_work=maintenance`);
+
   // ── Cleanup ─────────────────────────────────────────────────────────────
   const Database = require('better-sqlite3');
   const db = new Database(path.join(__dirname, 'data', 'events.db'));
-  db.prepare('DELETE FROM events WHERE id IN (?, ?)').run(eventId, open.body.id);
+  db.prepare('DELETE FROM events WHERE id IN (?, ?, ?, ?, ?)').run(
+    eventId, open.body.id, perimId, incidentId, ltId
+  );
   db.close();
   console.log('     (test events cleaned up)');
 }
