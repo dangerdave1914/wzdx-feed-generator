@@ -99,17 +99,22 @@ See `.env.example` for the full list. Key ones:
   for long-term; `is_end_date_verified: false` signals it's an estimate
 - SQLite storage — no concurrent-write corruption risk
 
-**Field capture (`/field-capture.html`)**
-- GPS point capture via `navigator.geolocation` — numbered markers appear on
-  map as placed, connected by a polyline showing the perimeter path
-- Accuracy circle displayed per fix (±Xm in status bar, blue radius on map)
-- Undo last marker
-- Obstruction type selector + short/long-term duration toggle
-- Incident types show a notice that they won't appear in the public feed
-- OSM Overpass lookup on first marker: pre-fills `total_lanes` and
-  `reduced_speed_limit_kph` if the nearest road way has those tags; labeled
-  "from OpenStreetMap — verify before submitting"; fails silently if no data
-- Publish disabled until road_name is filled and ≥3 markers are placed
+**Field capture — server side (exercised by `npm test`)**
+- `POST /api/events` accepts `perimeter_points` geometry submitted by the page
+- Obstruction type, duration, and speed limit stored and routed correctly
+- Incident filtering, types_of_work mapping, end_date estimation all covered
+  by the same test assertions as the rest of the feed
+
+**Field capture — browser UI (code-reviewed, not yet tested on a real device)**
+The following have been verified by reading the code but have not been walked
+through on a physical phone with GPS. Treat as believed-correct until
+device-tested:
+- GPS marker drop and accuracy circle display
+- Numbered markers + polyline rendering on map
+- Undo behavior
+- OSM Overpass prefill on first marker
+- Geolocation permission denial and timeout error messages
+- Full submit-to-server flow from the mobile UI
 
 ## What's not here yet
 
