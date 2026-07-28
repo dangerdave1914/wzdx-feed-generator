@@ -1,0 +1,22 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+        env:
+          API_KEY: ci-test-key
+          WZDX_PUBLISHER: CI Test Feed
+          WZDX_CONTACT_NAME: CI
+          WZDX_CONTACT_EMAIL: ci@example.com
