@@ -31,7 +31,7 @@
     line-height:1.35; color:var(--ink);
   }
   .type-btn.active { background:var(--accent); color:white; border-color:var(--accent); }
-  .type-btn.incident-type { border-color:#c09000; color:#7a5800; }
+  .type-btn.incident-type { color:#7a5800; }
   .type-btn.incident-type.active { background:#b08800; color:white; border-color:#b08800; }
 
   .incident-notice {
@@ -156,12 +156,12 @@
   <div class="row">
     <div>
       <label>Total lanes on road</label>
-      <input id="total_lanes" type="number" min="1" max="20" placeholder="e.g. 2">
+      <input id="total_lanes" type="number" min="1" max="20" placeholder="e.g. 2" autocomplete="off">
       <div class="osm-note" id="lanes-osm-note">from OpenStreetMap — verify before submitting</div>
     </div>
     <div>
       <label>Reduced speed limit (km/h)</label>
-      <input id="speed_kph" type="number" min="0" max="300" placeholder="optional">
+      <input id="speed_kph" type="number" min="0" max="300" placeholder="optional" autocomplete="off">
       <div class="osm-note" id="speed-osm-note">from OpenStreetMap — verify before submitting</div>
     </div>
   </div>
@@ -203,13 +203,32 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
 }).addTo(map);
 
-// Best-effort center on user position without blocking
-if (navigator.geolocation) {
-  navigator.geolocation.getCurrentPosition(
-    (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 16),
-    () => {}
-  );
-}
+// Best-effort center on user position without blocking.
+// Uses permissions.query so we only call getCurrentPosition if permission is
+// already granted — avoids triggering the OS dialog at page load, which can
+// leave Android in a cached "denied" state before the user taps Drop Marker.
+(async () => {
+  if (!navigator.geolocation) return;
+  try {
+    const perm = await navigator.permissions.query({ name: 'geolocation' });
+    if (perm.state === 'granted') {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 16),
+        () => {}
+      );
+    }
+    // If the user later grants permission in Settings, clear any denial message.
+    perm.onchange = () => {
+      if (perm.state === 'granted') clearResult();
+    };
+  } catch (_) {
+    // permissions.query not supported — fall back to silent attempt
+    navigator.geolocation.getCurrentPosition(
+      (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 16),
+      () => {}
+    );
+  }
+})();
 
 function makeMarkerIcon(n) {
   // Numbered circle icon — hardcoded color, CSS vars don't work in divIcon HTML
@@ -263,6 +282,7 @@ document.getElementById('drop-btn').addEventListener('click', () => {
 
   navigator.geolocation.getCurrentPosition(
     (pos) => {
+      clearResult(); // clear any stale denial or timeout message
       const latlng   = L.latLng(pos.coords.latitude, pos.coords.longitude);
       const accuracy = pos.coords.accuracy; // metres
 
@@ -298,12 +318,19 @@ document.getElementById('drop-btn').addEventListener('click', () => {
       }
     },
     (err) => {
-      const msgs = {
-        1: 'Location access denied — enable location permissions to use field capture.',
-        2: 'Location unavailable — move to an area with better GPS signal and try again.',
-        3: 'Location request timed out — try again.',
-      };
-      showResult('err', msgs[err.code] || `Location error (code ${err.code}).`);
+      if (err.code === 1) {
+        // Permission denied — show message with inline Retry link so the user
+        // can try again after granting access in Settings without reloading.
+        showResultWithRetry(
+          'Location access denied — enable location permissions in Settings, then tap '
+        );
+      } else {
+        const msgs = {
+          2: 'Location unavailable — move to an area with better GPS signal and try again.',
+          3: 'Location request timed out — try again.',
+        };
+        showResult('err', msgs[err.code] || `Location error (code ${err.code}).`);
+      }
       btn.disabled = false;
       btn.textContent = '📍 Drop Marker';
     },
@@ -458,11 +485,35 @@ function resetForm() {
   updatePublishState();
 }
 
+function clearResult() {
+  const el = document.getElementById('result');
+  el.style.display = 'none';
+  el.className = '';
+  el.textContent = '';
+}
+
 function showResult(cls, msg) {
   const el = document.getElementById('result');
   el.style.display = 'block';
   el.className = cls;
   el.textContent = msg;
+}
+
+// Shows an error with an inline "Retry" link that re-triggers Drop Marker.
+function showResultWithRetry(msg) {
+  const el = document.getElementById('result');
+  el.style.display = 'block';
+  el.className = 'err';
+  el.textContent = msg;
+  const link = document.createElement('a');
+  link.href = '#';
+  link.textContent = 'Retry';
+  link.style.cssText = 'color:inherit;font-weight:700;text-decoration:underline;';
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('drop-btn').click();
+  });
+  el.appendChild(link);
 }
 </script>
 </body>
