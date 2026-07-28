@@ -90,13 +90,14 @@ async function main() {
   assertValid(validate, res.body, 'empty feed');
 
   // ── Test 2: post an event, re-validate feed ─────────────────────────────
+  const inEightHours = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
   const posted = await request('POST', '/api/events', {
     road_name: 'SR-150',
     direction: 'eastbound',
     start_coords: [-86.81, 33.51],
     end_coords: [-86.79, 33.52],
-    start_date: '2026-07-28T06:00:00Z',
-    end_date: '2026-07-28T14:00:00Z',
+    start_date: new Date().toISOString(),
+    end_date: inEightHours,
     total_lanes: 2,
     lanes: [
       { order: 1, status: 'closed' },
@@ -134,7 +135,7 @@ async function main() {
     direction: 'westbound',
     start_coords: [-86.90, 33.50],
     end_coords: [-86.92, 33.50],
-    start_date: '2026-07-27T14:00:00Z',
+    start_date: new Date(Date.now() - 60 * 60 * 1000).toISOString(), // started 1hr ago
     vehicle_impact: 'all-lanes-closed',
     location_method: 'sign-method',
   });
@@ -161,7 +162,7 @@ async function main() {
       [-86.796, 33.511],
       [-86.798, 33.509],
     ],
-    start_date:              '2026-07-28T07:00:00Z',
+    start_date:              new Date().toISOString(),
     vehicle_impact:          'some-lanes-closed',
     location_method:         'channel-device-method',
     total_lanes:             2,
@@ -206,7 +207,7 @@ async function main() {
     obstruction_type: 'traffic-incident',
     start_coords:     [-86.810, 33.500],
     end_coords:       [-86.812, 33.500],
-    start_date:       '2026-07-28T09:00:00Z',
+    start_date:       new Date().toISOString(),
     vehicle_impact:   'all-lanes-closed',
     location_method:  'channel-device-method',
   });
@@ -235,7 +236,7 @@ async function main() {
     duration_type:    'long-term',
     start_coords:     [-86.820, 33.490],
     end_coords:       [-86.818, 33.491],
-    start_date:       '2026-07-28T06:00:00Z',
+    start_date:       new Date().toISOString(),
     vehicle_impact:   'some-lanes-closed',
     location_method:  'sign-method',
   });
@@ -252,8 +253,8 @@ async function main() {
 
   const ltFeature = res.body.features.find((f) => f.id === ltId);
   const estEnd = new Date(ltFeature.properties.end_date);
-  const start  = new Date('2026-07-28T06:00:00Z');
-  const diffDays = (estEnd - start) / (1000 * 60 * 60 * 24);
+  const ltStart  = new Date(longTerm.body.start_date);
+  const diffDays = (estEnd - ltStart) / (1000 * 60 * 60 * 24);
   if (diffDays < 6.9 || diffDays > 7.1) {
     console.error(`FAIL [long-term end_date]: expected ~7 days, got ${diffDays.toFixed(2)} days`);
     process.exit(1);
@@ -265,11 +266,78 @@ async function main() {
   }
   console.log(`PASS [long-term end_date]: estimated end is ${diffDays.toFixed(1)} days out, types_of_work=maintenance`);
 
+  // ── Test 7: closed event with expired end_date — must NOT appear in feed ─
+  // Post an event with end_date 2 hours in the past. With the default
+  // 60-minute retention window, this event is past the window and should be
+  // filtered from /feed immediately. We test this without waiting by using a
+  // backdated end_date in the POST — the server stores whatever date is given.
+  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  const expiredEvent = await request('POST', '/api/events', {
+    road_name:        'Test-Expired-Rd',
+    direction:        'northbound',
+    start_coords:     [-86.800, 33.500],
+    end_coords:       [-86.801, 33.501],
+    start_date:       new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), // 3 hrs ago
+    end_date:         twoHoursAgo,
+    vehicle_impact:   'some-lanes-closed',
+    location_method:  'channel-device-method',
+  });
+  if (expiredEvent.status !== 201) {
+    console.error('FAIL [expired event]: expected 201, got', expiredEvent.status, expiredEvent.body);
+    process.exit(1);
+  }
+  const expiredId = expiredEvent.body.id;
+
+  res = await request('GET', '/feed');
+  assertValid(validate, res.body, 'feed with expired event posted');
+  if (res.body.features.some((f) => f.id === expiredId)) {
+    console.error('FAIL [expired event filtered]: event with end_date 2hrs ago should not appear in feed (retention window is 60 min)');
+    process.exit(1);
+  }
+  console.log(`PASS [expired event filtered]: event past retention window is NOT in feed`);
+
+  // ── Test 8: just-closed event — must still appear in feed ────────────────
+  // Post an event, close it via PATCH (sets end_date = now), then verify it
+  // is still in the feed (within the 60-minute retention window).
+  const toClose = await request('POST', '/api/events', {
+    road_name:        'Test-Close-Rd',
+    direction:        'southbound',
+    start_coords:     [-86.802, 33.502],
+    end_coords:       [-86.803, 33.503],
+    start_date:       new Date(Date.now() - 60 * 60 * 1000).toISOString(), // started 1 hr ago
+    vehicle_impact:   'some-lanes-closed',
+    location_method:  'channel-device-method',
+  });
+  if (toClose.status !== 201) {
+    console.error('FAIL [close test post]: expected 201, got', toClose.status, toClose.body);
+    process.exit(1);
+  }
+  const toCloseId = toClose.body.id;
+
+  const closed = await request('PATCH', `/api/events/${toCloseId}/close`);
+  if (closed.status !== 200) {
+    console.error('FAIL [close event]: expected 200, got', closed.status, closed.body);
+    process.exit(1);
+  }
+  if (!closed.body.end_date) {
+    console.error('FAIL [close event]: end_date not set in response');
+    process.exit(1);
+  }
+  console.log(`PASS [close event]: PATCH /api/events/${toCloseId}/close set end_date = ${closed.body.end_date}`);
+
+  res = await request('GET', '/feed');
+  assertValid(validate, res.body, 'feed after event closed');
+  if (!res.body.features.some((f) => f.id === toCloseId)) {
+    console.error('FAIL [retention window]: just-closed event should still appear in feed within retention window');
+    process.exit(1);
+  }
+  console.log(`PASS [retention window]: just-closed event still appears in feed (within 60-min retention window)`);
+
   // ── Cleanup ─────────────────────────────────────────────────────────────
   const Database = require('better-sqlite3');
   const db = new Database(path.join(__dirname, 'data', 'events.db'));
-  db.prepare('DELETE FROM events WHERE id IN (?, ?, ?, ?, ?)').run(
-    eventId, open.body.id, perimId, incidentId, ltId
+  db.prepare('DELETE FROM events WHERE id IN (?, ?, ?, ?, ?, ?, ?)').run(
+    eventId, open.body.id, perimId, incidentId, ltId, expiredId, toCloseId
   );
   db.close();
   console.log('     (test events cleaned up)');

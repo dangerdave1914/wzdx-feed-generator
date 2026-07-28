@@ -24,6 +24,22 @@
   #result { margin-top:16px; padding:12px; border-radius:6px; font-size:0.85rem; white-space:pre-wrap; }
   #result.ok { background:#e7f3e8; border:1px solid #a9d3ad; }
   #result.err { background:#fbe9e7; border:1px solid #e3a49c; }
+
+  .section-divider { border:none; border-top:1px solid var(--line); margin:28px 0 20px; }
+  .event-list { list-style:none; padding:0; margin:10px 0 0; }
+  .event-item {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 12px; border:1px solid var(--line); border-radius:6px;
+    margin-bottom:6px; cursor:pointer; background:white;
+  }
+  .event-item:hover { border-color:#aaa; }
+  .event-item.selected { border-color:var(--accent); background:#fff8f6; }
+  .event-item-info { font-size:0.88rem; }
+  .event-item-info strong { display:block; }
+  .event-item-info span { color:#666; font-size:0.8rem; }
+  #close-result { margin-top:12px; padding:10px 12px; border-radius:6px; font-size:0.85rem; display:none; }
+  #close-result.ok  { background:#e7f3e8; border:1px solid #a9d3ad; }
+  #close-result.err { background:#fbe9e7; border:1px solid #e3a49c; }
   .hint { color:#888; font-size:0.8rem; margin-top:2px; }
 
   #map { height:320px; border-radius:8px; margin-top:10px; border:1px solid var(--line); }
@@ -130,6 +146,19 @@
   </form>
 
   <div id="result" style="display:none;"></div>
+
+  <hr class="section-divider">
+  <h2 style="font-size:1.15rem;margin-bottom:4px;">Mark event complete</h2>
+  <p class="sub">Close an active event. It stays in the feed for a short retention window, then drops.</p>
+
+  <button type="button" class="secondary" id="loadEventsBtn">Load active events</button>
+
+  <ul class="event-list" id="eventList" style="display:none;"></ul>
+
+  <div id="close-actions" style="display:none;margin-top:10px;">
+    <button type="button" id="closeEventBtn">Mark Complete</button>
+  </div>
+  <div id="close-result"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -320,6 +349,98 @@
       } else {
         resultDiv.className = 'err';
         resultDiv.textContent = 'Errors:\n' + (data.errors || []).join('\n');
+      }
+    } catch (err) {
+      resultDiv.style.display = 'block';
+      resultDiv.className = 'err';
+      resultDiv.textContent = 'Request failed: ' + err.message;
+    }
+  });
+
+  // ---- Mark Complete panel ----
+  let selectedEventId = null;
+
+  document.getElementById('loadEventsBtn').addEventListener('click', async () => {
+    const list = document.getElementById('eventList');
+    list.innerHTML = '<li style="color:#888;font-size:0.85rem;padding:8px 0;">Loading…</li>';
+    list.style.display = 'block';
+    document.getElementById('close-actions').style.display = 'none';
+    document.getElementById('close-result').style.display = 'none';
+    selectedEventId = null;
+
+    try {
+      const res = await fetch('/api/events');
+      const events = await res.json();
+      const now = Date.now();
+      const active = events.filter((ev) =>
+        !ev.end_date || new Date(ev.end_date).getTime() > now
+      );
+
+      list.innerHTML = '';
+      if (!active.length) {
+        list.innerHTML = '<li style="color:#888;font-size:0.85rem;padding:8px 0;">No active events.</li>';
+        return;
+      }
+
+      active.forEach((ev) => {
+        const li = document.createElement('li');
+        li.className = 'event-item';
+        li.dataset.id = ev.id;
+        const started = new Date(ev.start_date).toLocaleString(undefined, {
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+        });
+        li.innerHTML = `
+          <div class="event-item-info">
+            <strong>${ev.road_name}</strong>
+            <span>${ev.direction} &bull; started ${started}</span>
+          </div>
+          <span style="font-size:0.75rem;color:#aaa;">${ev.id.slice(0, 8)}…</span>
+        `;
+        li.addEventListener('click', () => {
+          document.querySelectorAll('.event-item').forEach((el) => el.classList.remove('selected'));
+          li.classList.add('selected');
+          selectedEventId = ev.id;
+          document.getElementById('close-actions').style.display = 'block';
+          document.getElementById('close-result').style.display = 'none';
+        });
+        list.appendChild(li);
+      });
+    } catch (err) {
+      list.innerHTML = `<li style="color:#c00;font-size:0.85rem;padding:8px 0;">Failed to load: ${err.message}</li>`;
+    }
+  });
+
+  document.getElementById('closeEventBtn').addEventListener('click', async () => {
+    if (!selectedEventId) return;
+    const resultDiv = document.getElementById('close-result');
+    const apiKey = localStorage.getItem('wzdx_api_key') || '';
+    const headers = { 'Content-Type': 'application/json' };
+    if (apiKey) headers['X-Api-Key'] = apiKey;
+
+    try {
+      const res = await fetch(`/api/events/${selectedEventId}/close`, {
+        method: 'PATCH', headers,
+      });
+      const data = await res.json();
+      resultDiv.style.display = 'block';
+      if (res.ok) {
+        resultDiv.className = 'ok';
+        resultDiv.textContent =
+          `Closed. Event ID: ${data.id}\n` +
+          `End date set to: ${new Date(data.end_date).toLocaleString()}\n` +
+          `Event remains in /feed during retention window, then drops.`;
+        document.getElementById('close-actions').style.display = 'none';
+        // Remove the closed item from the list
+        const li = document.querySelector(`.event-item[data-id="${selectedEventId}"]`);
+        if (li) li.remove();
+        selectedEventId = null;
+      } else if (res.status === 401) {
+        resultDiv.className = 'err';
+        resultDiv.textContent = 'API key required — click "🔑 API key" above to enter your key.';
+        document.getElementById('apiKeyPanel').style.display = 'block';
+      } else {
+        resultDiv.className = 'err';
+        resultDiv.textContent = 'Error: ' + (data.error || JSON.stringify(data));
       }
     } catch (err) {
       resultDiv.style.display = 'block';
