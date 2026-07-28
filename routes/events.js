@@ -3,6 +3,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const store = require('../models/store');
 const { buildWorkZoneFeed } = require('../models/wzdxFeed');
+const { buildMergeAdvisory } = require('../models/mergeAdvisory');
 
 const router = express.Router();
 
@@ -179,6 +180,31 @@ router.post('/events', requireApiKey, (req, res) => {
 // GET /api/events — internal list (not the public feed)
 router.get('/events', (req, res) => {
   res.json(store.getAllEvents());
+});
+
+// GET /api/events/:id/merge-advisory — value-add merge advisory (NOT a WZDx feed field)
+//
+// Computes taper length and advance warning distances from MUTCD 2009 Part 6C
+// for the given event.  This is our own data product — keep it out of wzdxFeed.js.
+//
+// Query parameters:
+//   posted_speed_mph  Required when the event has no reduced_speed_limit_kph.
+//   road_type         'urban' | 'rural' | 'freeway'  (default: 'rural')
+router.get('/events/:id/merge-advisory', (req, res) => {
+  const event = store.getEvent(req.params.id);
+  if (!event) return res.status(404).json({ error: 'event not found' });
+
+  try {
+    const advisory = buildMergeAdvisory(event, {
+      postedSpeedMph: req.query.posted_speed_mph
+        ? Number(req.query.posted_speed_mph)
+        : undefined,
+      roadType: req.query.road_type || undefined,
+    });
+    res.json(advisory);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // PATCH /api/events/:id/close — mark an event ended (e.g. work finished)

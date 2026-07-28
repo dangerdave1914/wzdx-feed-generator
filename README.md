@@ -126,6 +126,64 @@ The following have **not been device-tested at all**:
 - OSM Overpass prefill on first marker
 - Full submit-to-server flow from the mobile UI
 
+## Merge Advisory (value-add, separate from WZDx feed)
+
+`GET /api/events/:id/merge-advisory` computes MUTCD-based traffic control
+geometry for an event.  This is our own data product derived from event data —
+it is **not** a WZDx spec field and must never appear in the `/feed` output.
+
+```bash
+# Event has reduced_speed_limit_kph set
+curl http://localhost:3000/api/events/<id>/merge-advisory?road_type=rural
+
+# Event has no speed limit — supply it
+curl "http://localhost:3000/api/events/<id>/merge-advisory?posted_speed_mph=55&road_type=rural"
+```
+
+**Source:** FHWA MUTCD 2009 Edition with Revisions 1 & 2, Part 6C
+([mutcd.fhwa.dot.gov](https://mutcd.fhwa.dot.gov/htm/2009r1r2/part6/part6c.htm))
+
+| MUTCD table | Used for |
+|---|---|
+| Table 6C-4 (Section 6C.08) | Taper length formula |
+| Table 6C-1 | Advance warning sign spacing |
+
+**Taper length formula (Table 6C-4):**
+- Speed ≤ 40 mph: `L = W × S² / 60`
+- Speed ≥ 45 mph: `L = W × S`
+
+where L = taper length (ft), W = lane/offset width (ft), S = speed (mph).
+
+**Advance warning sign spacing (Table 6C-1):**
+
+| Road type | A (ft) | B (ft) | C (ft) | Total |
+|---|---|---|---|---|
+| Urban, low speed (≤ 40 mph) | 100 | 100 | 100 | 300 ft |
+| Urban, high speed (> 40 mph) | 350 | 350 | 350 | 1,050 ft |
+| Rural | 500 | 500 | 500 | 1,500 ft |
+| Freeway / Expressway | 1,000 | 1,500 | 2,640 | 5,140 ft |
+
+A = taper start → Sign 1 (nearest), B = Sign 1 → Sign 2, C = Sign 2 → Sign 3
+(furthest upstream; first sign approaching drivers see).
+
+**Query parameters:**
+
+| Parameter | Required | Values | Notes |
+|---|---|---|---|
+| `posted_speed_mph` | If event has no `reduced_speed_limit_kph` | positive number | No silent default — endpoint returns 400 if speed is unknown |
+| `road_type` | No | `urban` \| `rural` \| `freeway` | Defaults to `rural`; response flags `road_type_assumed: true` when defaulted |
+
+**Known limitations:**
+- Lane width assumed to be 12 ft (standard US lane per AASHTO Green Book).
+  Real widths vary 10–14 ft; accuracy improves if lane width is captured.
+- `road_type` is not auto-detected from geometry — supply it via query param
+  or accept the conservative `rural` default.
+- Does not account for road curvature, sight distance, or grade — MUTCD
+  recommends increasing taper length when sight distance is restricted.
+- Urban low/high speed threshold (40 mph) is MUTCD-delegated to the highway
+  agency; the constant `URBAN_HIGH_SPEED_THRESHOLD_MPH` in
+  `models/mergeAdvisory.js` can be changed to match your agency's standard.
+
 ## What's not here yet
 
 - **Map picker gaps** — the existing two-point picker (`index.html`) has no
