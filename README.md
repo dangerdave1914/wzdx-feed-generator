@@ -105,15 +105,25 @@ See `.env.example` for the full list. Key ones:
 - Incident filtering, types_of_work mapping, end_date estimation all covered
   by the same test assertions as the rest of the feed
 
-**Field capture — browser UI (code-reviewed, not yet tested on a real device)**
-The following have been verified by reading the code but have not been walked
-through on a physical phone with GPS. Treat as believed-correct until
-device-tested:
-- GPS marker drop and accuracy circle display
-- Numbered markers + polyline rendering on map
+**Field capture — browser UI (mixed — see below)**
+Real device testing was performed. GPS marker drop, map rendering, and the
+incident type selector were confirmed working. Two bugs were found and fixed:
+
+- Geolocation denial message persisted on screen even after permission was
+  granted — fixed by clearing it on successful marker drop and by not
+  triggering the OS permission dialog at page load (uses `permissions.query`
+  first so Android doesn't cache a denial before the user taps Drop Marker)
+- Both incident-type buttons appeared visually selected simultaneously when
+  one was active — fixed; was a CSS specificity issue, JS state was always
+  correct
+
+The following fixes are code-reviewed but **not yet re-verified on device**:
+- Geolocation permission flow (the new `permissions.query` path + Retry link)
+- `perm.onchange` clearing the denial banner when permission granted mid-session
+
+The following have **not been device-tested at all**:
 - Undo behavior
 - OSM Overpass prefill on first marker
-- Geolocation permission denial and timeout error messages
 - Full submit-to-server flow from the mobile UI
 
 ## What's not here yet
