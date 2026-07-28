@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "node server.js & sleep 1 && node test-schema.js; CODE=$?; kill %1 2>/dev/null; exit $CODE"
+    "test": "node server.js & node test-schema.js; CODE=$?; kill %1 2>/dev/null; exit $CODE"
   },
   "dependencies": {
     "ajv": "^8.20.0",

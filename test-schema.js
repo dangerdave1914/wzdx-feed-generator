@@ -17,6 +17,20 @@ const Ajv = require('ajv');
 const BASE = 'http://localhost:3000';
 const API_KEY = process.env.API_KEY || null;
 
+function waitForServer(retries = 20, intervalMs = 250) {
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+    function try_() {
+      http.get(BASE + '/feed', (res) => { res.resume(); resolve(); })
+        .on('error', () => {
+          if (++attempts >= retries) return reject(new Error('Server did not become ready'));
+          setTimeout(try_, intervalMs);
+        });
+    }
+    try_();
+  });
+}
+
 function request(method, urlPath, body) {
   return new Promise((resolve, reject) => {
     const payload = body ? JSON.stringify(body) : null;
@@ -68,6 +82,8 @@ function assertValid(validate, feed, label) {
 
 async function main() {
   const validate = buildValidator();
+
+  await waitForServer();
 
   // ── Test 1: empty feed ──────────────────────────────────────────────────
   let res = await request('GET', '/feed');
