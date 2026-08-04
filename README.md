@@ -180,6 +180,30 @@ A = taper start → Sign 1 (nearest), B = Sign 1 → Sign 2, C = Sign 2 → Sign
   agency; the constant `URBAN_HIGH_SPEED_THRESHOLD_MPH` in
   `models/mergeAdvisory.js` can be changed to match your agency's standard.
 
+
+## Crew device setup (zero-typing provisioning)
+
+Getting the API key onto a crew phone without typing a 64-character hex string:
+
+**Supervisor (one-time, on any device with the key already saved):**
+1. Open the intake form or field capture page and tap **🔑 API key**
+2. A **Generate setup link** panel appears below the key field
+3. Copy the link or show the QR code to the crew member
+
+**Crew member:**
+- Scan the QR code (or open the link) — the key is saved automatically and the
+  URL is cleaned immediately so the key never sits in the address bar or history
+- A green **Device provisioned** banner confirms success
+- From that point on, submitting events works without any further setup
+
+The setup URL is `https://sapiowzdx.com/?setup=<KEY>` — it works on both
+`/` (intake form) and `/field-capture.html`. The same QR code provisions either page.
+
+**If a device is lost:** rotate the `API_KEY` (one SSH command, see Auth section above),
+then regenerate the setup link/QR from any supervisor device and redistribute to remaining
+crew. There is no separate distribution-only key — rotating the real key is the
+revocation mechanism, and the process is already documented.
+
 ## What's not here yet
 
 - **Map picker gaps** — the existing two-point picker (`index.html`) has no

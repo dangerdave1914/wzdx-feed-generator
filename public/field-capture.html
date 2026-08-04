@@ -94,6 +94,10 @@
   }
   #result.ok  { background:#e7f3e8; border:1px solid #a9d3ad; }
   #result.err { background:#fbe9e7; border:1px solid #e3a49c; }
+  #setupLinkPanel { margin-top:14px;padding-top:14px;border-top:1px solid #d8d8d2; }
+  .sl-label { font-size:0.82rem;font-weight:600;margin:0 0 6px;color:#444; }
+  .setup-link-row { display:flex;gap:8px;align-items:center;margin-bottom:10px; }
+  .setup-link-row input[type=text] { font-family:monospace;font-size:0.73rem;color:#444;padding:9px 10px;border:1px solid #d8d8d2;border-radius:6px;background:white; }
 </style>
 </head>
 <body>
@@ -188,13 +192,33 @@
   <div id="apiKeyPanel" style="display:none;margin-top:8px;">
     <input type="password" id="apiKeyInput" autocomplete="off" placeholder="Paste key here" style="font-family:monospace;width:100%;padding:9px 10px;border:1px solid #d8d8d2;border-radius:6px;font-size:0.95rem;background:white;">
     <p style="color:#888;font-size:0.78rem;margin-top:3px;">Saved in this browser — won't need to be re-entered.</p>
+    <div id="setupLinkPanel" style="display:none;">
+      <p class="sl-label">Generate setup link</p>
+      <p style="color:#888;font-size:0.78rem;margin:0 0 10px;">Supervisor only — crew scans the QR once and the key is saved automatically. Only visible on devices with the key already entered.</p>
+      <div class="setup-link-row">
+        <input type="text" id="setupLinkInput" readonly>
+        <button type="button" id="copySetupLink" style="background:transparent;color:#c1440e;border:1px solid #c1440e;padding:8px 12px;border-radius:6px;font-size:0.82rem;cursor:pointer;white-space:nowrap;flex-shrink:0;">Copy link</button>
+      </div>
+      <div id="setupQR" style="text-align:center;padding:4px 0;"></div>
+    </div>
   </div>
 </div>
 <button id="publish-btn" type="button" disabled>Publish to Feed</button>
 <div id="result"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
+// ── Device provisioning via ?setup=<KEY> ──────────────────────────────────────────────────────
+(function () {
+  var k = new URLSearchParams(window.location.search).get('setup');
+  if (k && k.trim()) {
+    localStorage.setItem('wzdx_api_key', k.trim());
+    history.replaceState(null, '', window.location.pathname);
+    window.__wzdxProvisioned = true;
+  }
+})();
+
 // ── State ──────────────────────────────────────────────────────────────────
 let markers      = [];   // [{ latlng, leafletMarker, accuracyCircle }]
 let polyline     = null;
@@ -424,11 +448,49 @@ apiKeyInput.addEventListener('change', () => {
   const v = apiKeyInput.value.trim();
   if (v) localStorage.setItem('wzdx_api_key', v);
   else localStorage.removeItem('wzdx_api_key');
+  renderSetupLink();
 });
 document.getElementById('apiKeyToggle').addEventListener('click', () => {
   const p = document.getElementById('apiKeyPanel');
   p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  if (p.style.display === 'block') renderSetupLink();
 });
+
+// ── Setup link + QR code generator ────────────────────────────────────────────
+function renderSetupLink() {
+  var key = localStorage.getItem('wzdx_api_key');
+  var panel = document.getElementById('setupLinkPanel');
+  if (!key) { panel.style.display = 'none'; return; }
+  var url = window.location.origin + window.location.pathname + '?setup=' + encodeURIComponent(key);
+  document.getElementById('setupLinkInput').value = url;
+  panel.style.display = 'block';
+  var qrDiv = document.getElementById('setupQR');
+  qrDiv.innerHTML = '';
+  new QRCode(qrDiv, { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
+}
+
+document.getElementById('copySetupLink').addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('setupLinkInput').value).then(() => {
+    var btn = document.getElementById('copySetupLink');
+    var orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  });
+});
+
+renderSetupLink(); // run on load — shows panel if key already saved
+
+// Provisioning confirmation banner (auto-dismisses after 3.5s)
+if (window.__wzdxProvisioned) {
+  var b = document.createElement('div');
+  b.textContent = '✓ Device provisioned — API key saved.';
+  b.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);'
+    + 'background:#2e7d32;color:white;padding:10px 22px;border-radius:8px;'
+    + 'font-size:0.9rem;z-index:9999;box-shadow:0 2px 10px rgba(0,0,0,.25);'
+    + 'white-space:nowrap;transition:opacity 0.6s ease';
+  document.body.appendChild(b);
+  setTimeout(() => { b.style.opacity = '0'; setTimeout(() => b.remove(), 700); }, 3500);
+}
 
 // ── Publish ────────────────────────────────────────────────────────────────
 function updatePublishState() {
