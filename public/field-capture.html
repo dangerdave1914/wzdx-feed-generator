@@ -688,7 +688,7 @@ document.addEventListener('DOMContentLoaded', function () {
         onReset: function () { localStorage.setItem('wzdx_tour_seen', '1'); }
       });
       driverObj.defineSteps([
-        { popover: { title: 'Field Capture Mode', description: 'This page is built for phones. Walk the work zone and drop GPS markers as you go. No map-clicking needed. This tour walks you through the whole process.', position: 'mid-center' } },
+        { element: 'h1', popover: { title: 'Field Capture Mode', description: 'This page is built for phones. Walk the work zone and drop GPS markers as you go. No map-clicking needed. This tour walks you through the whole process.', position: 'bottom' } },
         { element: '.type-grid', popover: { title: 'What Kind of Event Is This?', description: 'Pick the type that best fits. Construction and Road Maintenance go to the public WZDx feed. Traffic incidents and EMS calls are saved for your records but not published.', position: 'bottom' } },
         { element: '.dur-row', popover: { title: 'How Long Will It Last?', description: 'Short-term means the work wraps up within the day. Long-term is multi-day. This affects how the event is labeled in the feed.', position: 'bottom' } },
         { element: '#road_name', popover: { title: 'Road Name', description: 'Type the name of the road. Keep it simple like Oak Street or SR-150 so dispatchers and navigation apps can identify it.', position: 'bottom' } },

@@ -598,7 +598,7 @@ document.addEventListener('DOMContentLoaded', function () {
         onReset: function () { localStorage.setItem('wzdx_tour_seen', '1'); }
       });
       driverObj.defineSteps([
-        { popover: { title: 'Work Zone Intake Form', description: 'This form sends work zone reports to the live SapioWZDX feed. Navigation apps and transportation agencies read this feed in real time. This tour covers every field.', position: 'mid-center' } },
+        { element: 'h1', popover: { title: 'Work Zone Intake Form', description: 'This form sends work zone reports to the live SapioWZDX feed. Navigation apps and transportation agencies read this feed in real time. This tour covers every field.', position: 'bottom' } },
         { element: 'input[name=\"road_name\"]', popover: { title: 'Road Name', description: 'Enter the road where work is happening. Be specific: I-459 N or Oak Street at 5th Ave is more useful than just saying the highway.', position: 'bottom' } },
         { element: 'select[name=\"direction\"]', popover: { title: 'Direction of Travel', description: 'Which direction is affected? This is the direction drivers are traveling through the work zone, not the direction you are facing.', position: 'bottom' } },
         { element: 'select[name=\"location_method\"]', popover: { title: 'How Was the Extent Determined?', description: 'Channel devices means you placed cones or barrels to mark the zone. Use Reference signs if you measured from posted mile markers or cross-streets.', position: 'bottom' } },
