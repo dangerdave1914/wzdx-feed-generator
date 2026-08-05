@@ -247,16 +247,22 @@
   <button id="tour-btn" class="sp-tour-btn">&#x1F3AF; Take the tour</button>
   <p class="sp-hint">A quick walkthrough of every field &#8212; helpful for first-time crew.</p>
   <div id="setupLinkPanel" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">
-    <p style="font-weight:600;font-size:0.88rem;margin:0 0 3px;">Generate setup link</p>
-    <p id="setupNoKey" style="font-size:0.78rem;color:#888;margin:0 0 8px;">Enter an API key (above) to generate a provisioning link for crew devices.</p>
-    <div id="setupHasKey" style="display:none;">
-    <p style="font-size:0.78rem;color:#888;margin:0 0 8px;">Supervisor only &#8212; crew scans once and the key saves automatically.</p>
-    <div class="setup-link-row">
-      <input type="text" id="setupLinkInput" readonly style="font-size:0.7rem;min-width:0;">
-      <button type="button" id="copySetupLink" style="background:transparent;color:#c1440e;border:1px solid #c1440e;padding:5px 8px;border-radius:6px;font-size:0.78rem;cursor:pointer;white-space:nowrap;flex-shrink:0;">Copy</button>
+    <p style="font-weight:600;font-size:0.88rem;margin:0 0 4px;">Generate setup link</p>
+    <p style="font-size:0.78rem;color:#888;margin:0 0 8px;">Crew scans once &#8212; the API key saves automatically.</p>
+    <div id="setupKeyRow">
+      <div style="display:flex;gap:6px;margin-bottom:6px;">
+        <input type="password" id="setupKeyEntry" placeholder="Paste API key" autocomplete="off"
+               style="flex:1;font-family:monospace;font-size:0.78rem;">
+        <button type="button" id="setupKeyBtn" style="padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;">Save</button>
+      </div>
     </div>
-    <div id="setupQR" style="text-align:center;padding:4px 0;"></div>
-    </div><!-- /setupHasKey -->
+    <div id="setupHasKey" style="display:none;">
+      <div class="setup-link-row">
+        <input type="text" id="setupLinkInput" readonly style="font-size:0.7rem;min-width:0;">
+        <button type="button" id="copySetupLink" style="background:transparent;color:#c1440e;border:1px solid #c1440e;padding:5px 8px;border-radius:6px;font-size:0.78rem;cursor:pointer;white-space:nowrap;flex-shrink:0;">Copy</button>
+      </div>
+      <div id="setupQR" style="text-align:center;padding:4px 0;"></div>
+    </div>
   </div>
 </div>
 
@@ -495,17 +501,17 @@ document.getElementById('apiKeyToggle').addEventListener('click', () => {
   p.style.display = p.style.display === 'none' ? 'block' : 'none';
 });
 
-// ── Setup link + QR code (always visible in Settings panel) ──────────────
+// ── Setup link + QR code ─────────────────────────────────────────
 function renderSetupLink() {
   var key = localStorage.getItem('wzdx_api_key');
   var hasKey = document.getElementById('setupHasKey');
-  var noKey  = document.getElementById('setupNoKey');
+  var keyRow = document.getElementById('setupKeyRow');
   if (!key) {
     hasKey.style.display = 'none';
-    noKey.style.display  = 'block';
+    keyRow.style.display = 'block';
     return;
   }
-  noKey.style.display  = 'none';
+  keyRow.style.display = 'none';
   hasKey.style.display = 'block';
   var url = window.location.origin + window.location.pathname + '?setup=' + encodeURIComponent(key);
   document.getElementById('setupLinkInput').value = url;
@@ -514,13 +520,25 @@ function renderSetupLink() {
   try { new QRCode(qrDiv, { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M }); } catch (_) {}
 }
 
-document.getElementById('copySetupLink').addEventListener('click', () => {
-  navigator.clipboard.writeText(document.getElementById('setupLinkInput').value).then(() => {
+document.getElementById('setupKeyBtn').addEventListener('click', function() {
+  var v = document.getElementById('setupKeyEntry').value.trim();
+  if (!v) return;
+  localStorage.setItem('wzdx_api_key', v);
+  var main = document.getElementById('apiKeyInput');
+  if (main) main.value = v;
+  renderSetupLink();
+});
+
+document.getElementById('copySetupLink').addEventListener('click', function() {
+  navigator.clipboard.writeText(document.getElementById('setupLinkInput').value).then(function() {
     var btn = document.getElementById('copySetupLink');
     var orig = btn.textContent;
     btn.textContent = 'Copied!';
-    setTimeout(() => { btn.textContent = orig; }, 2000);
+    setTimeout(function() { btn.textContent = orig; }, 2000);
   });
+});
+
+renderSetupLink();
 });
 
 
