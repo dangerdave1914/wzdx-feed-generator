@@ -378,7 +378,7 @@
     panel.style.display = 'block';
     var qrDiv = document.getElementById('setupQR');
     qrDiv.innerHTML = '';
-    new QRCode(qrDiv, { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
+    try { new QRCode(qrDiv, { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M }); } catch (_) {}
   }
 
   document.getElementById('copySetupLink').addEventListener('click', () => {
@@ -390,8 +390,6 @@
     });
   });
 
-  // Show setup link on load if key is already stored
-  renderSetupLink();
 
   // Provisioning confirmation banner (auto-dismisses after 3.5 s)
   if (window.__wzdxProvisioned) {
