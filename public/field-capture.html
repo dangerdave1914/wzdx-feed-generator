@@ -228,15 +228,6 @@
   <div id="apiKeyPanel" style="display:none;margin-top:8px;">
     <input type="password" id="apiKeyInput" autocomplete="off" placeholder="Paste key here" style="font-family:monospace;width:100%;padding:9px 10px;border:1px solid #d8d8d2;border-radius:6px;font-size:0.95rem;background:white;">
     <p style="color:#888;font-size:0.78rem;margin-top:3px;">Saved in this browser — won't need to be re-entered.</p>
-    <div id="setupLinkPanel" style="display:none;">
-      <p class="sl-label">Generate setup link</p>
-      <p style="color:#888;font-size:0.78rem;margin:0 0 10px;">Supervisor only — crew scans the QR once and the key is saved automatically. Only visible on devices with the key already entered.</p>
-      <div class="setup-link-row">
-        <input type="text" id="setupLinkInput" readonly>
-        <button type="button" id="copySetupLink" style="background:transparent;color:#c1440e;border:1px solid #c1440e;padding:8px 12px;border-radius:6px;font-size:0.82rem;cursor:pointer;white-space:nowrap;flex-shrink:0;">Copy link</button>
-      </div>
-      <div id="setupQR" style="text-align:center;padding:4px 0;"></div>
-    </div>
   </div>
 </div>
 <button id="publish-btn" type="button" disabled>Publish to Feed</button>
@@ -490,7 +481,6 @@ apiKeyInput.addEventListener('change', () => {
 document.getElementById('apiKeyToggle').addEventListener('click', () => {
   const p = document.getElementById('apiKeyPanel');
   p.style.display = p.style.display === 'none' ? 'block' : 'none';
-  if (p.style.display === 'block') renderSetupLink();
 });
 
 // ── Setup link + QR code generator ────────────────────────────────────────────
@@ -647,6 +637,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var panel = document.getElementById('settings-panel');
       panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
       document.getElementById('tour-badge').style.display = 'none';
+      if (panel.style.display === 'block') renderSetupLink();
     });
     document.getElementById('settings-close').addEventListener('click', function () {
       document.getElementById('settings-panel').style.display = 'none';
@@ -715,6 +706,15 @@ document.addEventListener('DOMContentLoaded', function () {
   </div>
   <button id="tour-btn" class="sp-tour-btn">&#127919; Take the tour</button>
   <p class="sp-hint">A quick walkthrough of every field &#8212; helpful for first-time crew.</p>
+  <div id="setupLinkPanel" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">
+    <p style="font-weight:600;font-size:0.88rem;margin:0 0 3px;">Generate setup link</p>
+    <p style="font-size:0.78rem;color:#888;margin:0 0 8px;">Supervisor only &#8212; crew scans once and the key saves automatically.</p>
+    <div class="setup-link-row">
+      <input type="text" id="setupLinkInput" readonly style="font-size:0.7rem;min-width:0;">
+      <button type="button" id="copySetupLink" class="secondary" style="white-space:nowrap;flex-shrink:0;font-size:0.78rem;padding:5px 8px;">Copy</button>
+    </div>
+    <div id="setupQR" style="text-align:center;padding:4px 0;"></div>
+  </div>
 </div>
 <div id="tour-badge" role="button" tabindex="0">
   New here? Take the tour
