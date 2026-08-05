@@ -53,12 +53,10 @@
   .coord-readout strong { font-variant-numeric:tabular-nums; }
   .coord-readout .unset { color:#bbb; font-style:italic; font-weight:normal; }
   .locate-btn { margin-left:auto; }
-  #setupLinkPanel { margin-top:14px;padding-top:14px;border-top:1px solid #e0e0d8; }
-  .sl-label { font-size:0.82rem;font-weight:600;margin:0 0 6px;color:#444; }
   .setup-link-row { display:flex;gap:8px;align-items:center;margin-bottom:10px; }
   .setup-link-row input[type=text] { font-family:monospace;font-size:0.73rem;color:#444; }
 
-  /* ---- Settings panel + tour badge ---- */
+  /* ---- Settings panel ---- */
   #settings-btn {
     position:fixed;top:12px;right:12px;z-index:1000;
     width:36px;height:36px;border-radius:50%;
@@ -70,7 +68,7 @@
   #settings-panel {
     display:none;position:fixed;top:56px;right:12px;z-index:1000;
     background:white;border:1px solid var(--line);border-radius:10px;
-    padding:14px 16px;min-width:210px;
+    padding:14px 16px;min-width:220px;
     box-shadow:0 4px 18px rgba(0,0,0,.15);
   }
   .sp-header { display:flex;justify-content:space-between;align-items:center;margin-bottom:12px; }
@@ -81,6 +79,8 @@
     border:none;border-radius:6px;font-size:0.88rem;cursor:pointer;text-align:left;
   }
   .sp-hint { font-size:0.78rem;color:#888;margin:8px 0 0; }
+
+  /* ---- Tour badge ---- */
   #tour-badge {
     display:none;position:fixed;top:56px;right:12px;z-index:999;
     background:#1a1a1a;color:white;padding:9px 12px 9px 14px;
@@ -120,22 +120,22 @@
       </select>
       <label>Closure extent</label>
       <div class="map-toolbar">
-        <button type="button" class="mode-btn active" id="modeStart" data-mode="start">📍 Set start point</button>
-        <button type="button" class="mode-btn" id="modeEnd" data-mode="end">🏁 Set end point</button>
-        <button type="button" class="mode-btn locate-btn" id="locateMe">🎯 My location</button>
+        <button type="button" class="mode-btn active" id="modeStart" data-mode="start">&#x1F4CD; Set start point</button>
+        <button type="button" class="mode-btn" id="modeEnd" data-mode="end">&#x1F3C1; Set end point</button>
+        <button type="button" class="mode-btn locate-btn" id="locateMe">&#x1F3AF; My location</button>
       </div>
       <div id="map"></div>
       <div class="coord-readout">
         <div>
           <span>Start (lng, lat)</span>
-          <strong id="startReadout" class="unset">not set — click the map</strong>
+          <strong id="startReadout" class="unset">not set &#8212; click the map</strong>
         </div>
         <div>
           <span>End (lng, lat)</span>
           <strong id="endReadout" class="unset">not set</strong>
         </div>
       </div>
-      <p class="hint">Click "Set start point," click the map, then switch to "Set end point" and click again. Drag either pin to fine-tune.</p>
+      <p class="hint">Click &#8220;Set start point,&#8221; click the map, then switch to &#8220;Set end point&#8221; and click again. Drag either pin to fine-tune.</p>
       <input type="hidden" name="start_lng"><input type="hidden" name="start_lat">
       <input type="hidden" name="end_lng"><input type="hidden" name="end_lat">
     </fieldset>
@@ -176,10 +176,10 @@
     </fieldset>
 
     <div style="margin-bottom:14px;">
-      <button type="button" id="apiKeyToggle" style="background:none;border:none;padding:0;color:#888;font-size:0.82rem;cursor:pointer;text-decoration:underline;">🔑 API key</button>
+      <button type="button" id="apiKeyToggle" style="background:none;border:none;padding:0;color:#888;font-size:0.82rem;cursor:pointer;text-decoration:underline;">&#x1F511; API key</button>
       <div id="apiKeyPanel" style="display:none;margin-top:8px;">
         <input type="password" id="apiKeyInput" autocomplete="off" placeholder="Paste key here" style="font-family:monospace;">
-        <p class="hint">Saved in this browser — won't need to be re-entered.</p>
+        <p class="hint">Saved in this browser &#8212; won&#8217;t need to be re-entered.</p>
       </div>
     </div>
     <button type="submit">Publish to feed</button>
@@ -200,11 +200,41 @@
   </div>
   <div id="close-result"></div>
 
+  <!-- Settings gear (fixed, top-right) -->
+  <button id="settings-btn" aria-label="Settings" title="Settings">&#9881;</button>
+
+  <!-- Settings panel — all interactive elements here are in the DOM
+       before the script tag, so no DOMContentLoaded is needed -->
+  <div id="settings-panel" role="dialog" aria-label="Settings">
+    <div class="sp-header">
+      <span>Settings</span>
+      <button id="settings-close" aria-label="Close settings">&#x2715;</button>
+    </div>
+    <button id="tour-btn" class="sp-tour-btn">&#x1F3AF; Take the tour</button>
+    <p class="sp-hint">A quick walkthrough of every field &#8212; helpful for first-time crew.</p>
+    <div id="setupLinkPanel" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">
+      <p style="font-weight:600;font-size:0.88rem;margin:0 0 3px;">Generate setup link</p>
+      <p style="font-size:0.78rem;color:#888;margin:0 0 8px;">Supervisor only &#8212; crew scans once and the key saves automatically.</p>
+      <div class="setup-link-row">
+        <input type="text" id="setupLinkInput" readonly style="font-size:0.7rem;min-width:0;">
+        <button type="button" id="copySetupLink" class="secondary" style="white-space:nowrap;flex-shrink:0;font-size:0.78rem;padding:5px 8px;">Copy</button>
+      </div>
+      <div id="setupQR" style="text-align:center;padding:4px 0;"></div>
+    </div>
+  </div>
+
+  <!-- First-visit tour badge -->
+  <div id="tour-badge" role="button" tabindex="0" aria-label="Take the tour">
+    New here? Take the tour
+    <button id="badge-dismiss" aria-label="Dismiss">&#x2715;</button>
+  </div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/driver.js/0.9.8/driver.min.js"></script>
 <script>
   // ---- Device provisioning via ?setup=<KEY> ----
+  // Saves the key to localStorage and strips the param from the URL.
   (function () {
     var k = new URLSearchParams(window.location.search).get('setup');
     if (k && k.trim()) {
@@ -223,19 +253,19 @@
   }).addTo(map);
 
   const startIcon = L.divIcon({ className: '', html: '<div style="background:#2e7d32;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
-  const endIcon = L.divIcon({ className: '', html: '<div style="background:#c1440e;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
+  const endIcon   = L.divIcon({ className: '', html: '<div style="background:#c1440e;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
 
   let startMarker = null;
   let endMarker = null;
   let connector = null;
-  let mode = 'start';
+  let mode = 'start'; // 'start' | 'end'
 
   const startLng = document.querySelector('input[name="start_lng"]');
   const startLat = document.querySelector('input[name="start_lat"]');
-  const endLng = document.querySelector('input[name="end_lng"]');
-  const endLat = document.querySelector('input[name="end_lat"]');
+  const endLng   = document.querySelector('input[name="end_lng"]');
+  const endLat   = document.querySelector('input[name="end_lat"]');
   const startReadout = document.getElementById('startReadout');
-  const endReadout = document.getElementById('endReadout');
+  const endReadout   = document.getElementById('endReadout');
 
   function fmt(n) { return Number(n).toFixed(6); }
 
@@ -277,7 +307,7 @@
   map.on('click', (e) => {
     if (mode === 'start') {
       setStart(e.latlng);
-      setMode('end');
+      setMode('end'); // auto-advance so next click sets the end point
     } else {
       setEnd(e.latlng);
     }
@@ -295,7 +325,7 @@
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 15),
-      () => {}
+      () => { /* silently ignore — map stays at default */ }
     );
   });
 
@@ -338,12 +368,10 @@
     p.style.display = p.style.display === 'none' ? 'block' : 'none';
   });
 
-  // ---- Setup link + QR code generator ----
-  // Null-guards against #setupLinkPanel living after </script> in HTML.
+  // ---- Setup link + QR code (shown in Settings panel when key exists) ----
   function renderSetupLink() {
-    var panel = document.getElementById('setupLinkPanel');
-    if (!panel) return;
     var key = localStorage.getItem('wzdx_api_key');
+    var panel = document.getElementById('setupLinkPanel');
     if (!key) { panel.style.display = 'none'; return; }
     var url = window.location.origin + window.location.pathname + '?setup=' + encodeURIComponent(key);
     document.getElementById('setupLinkInput').value = url;
@@ -351,6 +379,30 @@
     var qrDiv = document.getElementById('setupQR');
     qrDiv.innerHTML = '';
     new QRCode(qrDiv, { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
+  }
+
+  document.getElementById('copySetupLink').addEventListener('click', () => {
+    navigator.clipboard.writeText(document.getElementById('setupLinkInput').value).then(() => {
+      var btn = document.getElementById('copySetupLink');
+      var orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = orig; }, 2000);
+    });
+  });
+
+  // Show setup link on load if key is already stored
+  renderSetupLink();
+
+  // Provisioning confirmation banner (auto-dismisses after 3.5 s)
+  if (window.__wzdxProvisioned) {
+    var b = document.createElement('div');
+    b.textContent = '\u2713 Device provisioned \u2014 API key saved.';
+    b.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);'
+      + 'background:#2e7d32;color:white;padding:10px 22px;border-radius:8px;'
+      + 'font-size:0.9rem;z-index:9999;box-shadow:0 2px 10px rgba(0,0,0,.25);'
+      + 'white-space:nowrap;transition:opacity 0.6s ease';
+    document.body.appendChild(b);
+    setTimeout(() => { b.style.opacity = '0'; setTimeout(() => b.remove(), 700); }, 3500);
   }
 
   // ---- Form submit ----
@@ -367,20 +419,20 @@
     }
 
     const lanes = [...lanesDiv.children].map((row) => ({
-      order: Number(row.querySelector('[data-field="order"]').value),
+      order:  Number(row.querySelector('[data-field="order"]').value),
       status: row.querySelector('[data-field="status"]').value,
     }));
 
     const totalLanesRaw = f.total_lanes.value;
     const payload = {
-      road_name: f.road_name.value,
-      direction: f.direction.value,
+      road_name:      f.road_name.value,
+      direction:      f.direction.value,
       location_method: f.location_method.value,
-      start_coords: [Number(f.start_lng.value), Number(f.start_lat.value)],
-      end_coords: [Number(f.end_lng.value), Number(f.end_lat.value)],
-      start_date: f.start_date.value ? new Date(f.start_date.value).toISOString() : null,
-      end_date: f.end_date.value ? new Date(f.end_date.value).toISOString() : null,
-      total_lanes: totalLanesRaw ? Number(totalLanesRaw) : undefined,
+      start_coords:   [Number(f.start_lng.value), Number(f.start_lat.value)],
+      end_coords:     [Number(f.end_lng.value),   Number(f.end_lat.value)],
+      start_date:     f.start_date.value ? new Date(f.start_date.value).toISOString() : null,
+      end_date:       f.end_date.value   ? new Date(f.end_date.value).toISOString()   : null,
+      total_lanes:    totalLanesRaw ? Number(totalLanesRaw) : undefined,
       lanes,
       vehicle_impact: f.vehicle_impact.value,
     };
@@ -389,11 +441,7 @@
       const apiKey = localStorage.getItem('wzdx_api_key') || '';
       const headers = { 'Content-Type': 'application/json' };
       if (apiKey) headers['X-Api-Key'] = apiKey;
-      const res = await fetch('/api/events', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch('/api/events', { method: 'POST', headers, body: JSON.stringify(payload) });
       const data = await res.json();
       resultDiv.style.display = 'block';
       if (res.ok) {
@@ -403,14 +451,14 @@
         lanesDiv.innerHTML = '';
         addLaneRow(); addLaneRow();
         if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
-        if (endMarker) { map.removeLayer(endMarker); endMarker = null; }
-        if (connector) { map.removeLayer(connector); connector = null; }
+        if (endMarker)   { map.removeLayer(endMarker);   endMarker   = null; }
+        if (connector)   { map.removeLayer(connector);   connector   = null; }
         startReadout.textContent = 'not set \u2014 click the map'; startReadout.classList.add('unset');
-        endReadout.textContent = 'not set'; endReadout.classList.add('unset');
+        endReadout.textContent   = 'not set';                       endReadout.classList.add('unset');
         setMode('start');
       } else if (res.status === 401) {
         resultDiv.className = 'err';
-        resultDiv.textContent = 'API key required \u2014 click "\uD83D\uDD11 API key" above to enter your key.';
+        resultDiv.textContent = 'API key required \u2014 click \u201c\uD83D\uDD11 API key\u201d above to enter your key.';
         document.getElementById('apiKeyPanel').style.display = 'block';
       } else {
         resultDiv.className = 'err';
@@ -438,9 +486,7 @@
       const res = await fetch('/api/events');
       const events = await res.json();
       const now = Date.now();
-      const active = events.filter((ev) =>
-        !ev.end_date || new Date(ev.end_date).getTime() > now
-      );
+      const active = events.filter((ev) => !ev.end_date || new Date(ev.end_date).getTime() > now);
 
       list.innerHTML = '';
       if (!active.length) {
@@ -484,9 +530,7 @@
     if (apiKey) headers['X-Api-Key'] = apiKey;
 
     try {
-      const res = await fetch(`/api/events/${selectedEventId}/close`, {
-        method: 'PATCH', headers,
-      });
+      const res = await fetch(`/api/events/${selectedEventId}/close`, { method: 'PATCH', headers });
       const data = await res.json();
       resultDiv.style.display = 'block';
       if (res.ok) {
@@ -501,7 +545,7 @@
         selectedEventId = null;
       } else if (res.status === 401) {
         resultDiv.className = 'err';
-        resultDiv.textContent = 'API key required \u2014 click "\uD83D\uDD11 API key" above to enter your key.';
+        resultDiv.textContent = 'API key required \u2014 click \u201c\uD83D\uDD11 API key\u201d above to enter your key.';
         document.getElementById('apiKeyPanel').style.display = 'block';
       } else {
         resultDiv.className = 'err';
@@ -514,123 +558,65 @@
     }
   });
 
-  // ---- Elements living after </script> — wire up via DOMContentLoaded ----
-  // (#settings-btn, #settings-panel, #setupLinkPanel, #copySetupLink,
-  //  #tour-badge, #badge-dismiss are all in HTML below the </script> tag.)
-  document.addEventListener('DOMContentLoaded', function () {
-
-    // Panel is in DOM now — do initial render
-    renderSetupLink();
-
-    // Copy-to-clipboard for the setup link
-    document.getElementById('copySetupLink').addEventListener('click', function () {
-      navigator.clipboard.writeText(document.getElementById('setupLinkInput').value).then(function () {
-        var btn = document.getElementById('copySetupLink');
-        var orig = btn.textContent;
-        btn.textContent = 'Copied!';
-        setTimeout(function () { btn.textContent = orig; }, 2000);
-      });
-    });
-
-    // Provisioning confirmation banner (auto-dismisses after 3.5 s)
-    if (window.__wzdxProvisioned) {
-      var b = document.createElement('div');
-      b.textContent = '\u2713 Device provisioned \u2014 API key saved.';
-      b.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);'
-        + 'background:#2e7d32;color:white;padding:10px 22px;border-radius:8px;'
-        + 'font-size:0.9rem;z-index:9999;box-shadow:0 2px 10px rgba(0,0,0,.25);'
-        + 'white-space:nowrap;transition:opacity 0.6s ease';
-      document.body.appendChild(b);
-      setTimeout(function () { b.style.opacity = '0'; setTimeout(function () { b.remove(); }, 700); }, 3500);
+  // ---- Settings panel ----
+  document.getElementById('settings-btn').addEventListener('click', () => {
+    var panel = document.getElementById('settings-panel');
+    var isOpen = panel.style.display === 'block';
+    panel.style.display = isOpen ? 'none' : 'block';
+    document.getElementById('tour-badge').style.display = 'none';
+    if (!isOpen) renderSetupLink();
+  });
+  document.getElementById('settings-close').addEventListener('click', () => {
+    document.getElementById('settings-panel').style.display = 'none';
+  });
+  document.addEventListener('click', (e) => {
+    var panel = document.getElementById('settings-panel');
+    var btn   = document.getElementById('settings-btn');
+    if (panel.style.display === 'block' && !panel.contains(e.target) && !btn.contains(e.target)) {
+      panel.style.display = 'none';
     }
-
-    // ---- Settings panel ----
-    document.getElementById('settings-btn').addEventListener('click', function () {
-      var panel = document.getElementById('settings-panel');
-      panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
-      document.getElementById('tour-badge').style.display = 'none';
-      if (panel.style.display === 'block') renderSetupLink();
-    });
-    document.getElementById('settings-close').addEventListener('click', function () {
-      document.getElementById('settings-panel').style.display = 'none';
-    });
-    document.addEventListener('click', function (e) {
-      var panel = document.getElementById('settings-panel');
-      var btn   = document.getElementById('settings-btn');
-      if (panel.style.display === 'block' && !panel.contains(e.target) && !btn.contains(e.target)) {
-        panel.style.display = 'none';
-      }
-    });
-    document.getElementById('tour-btn').addEventListener('click', function () {
-      document.getElementById('settings-panel').style.display = 'none';
-      setTimeout(startTour, 0);
-    });
-
-    // ---- First-visit badge ----
-    if (!localStorage.getItem('wzdx_tour_seen')) {
-      setTimeout(function () {
-        document.getElementById('tour-badge').style.display = 'flex';
-      }, 800);
-    }
-    document.getElementById('tour-badge').addEventListener('click', function () {
-      document.getElementById('tour-badge').style.display = 'none';
-      setTimeout(startTour, 0);
-    });
-    document.getElementById('badge-dismiss').addEventListener('click', function (e) {
-      e.stopPropagation();
-      document.getElementById('tour-badge').style.display = 'none';
-      localStorage.setItem('wzdx_tour_seen', '1');
-    });
-
-    // ---- Guided tour ----
-    function startTour() {
-      var driverObj = new Driver({
-        animate: true, opacity: 0.75, padding: 8, allowClose: true,
-        doneBtnText: 'Done', closeBtnText: 'Skip tour',
-        nextBtnText: 'Next \u2192', prevBtnText: '\u2190 Back',
-        onReset: function () { localStorage.setItem('wzdx_tour_seen', '1'); }
-      });
-      driverObj.defineSteps([
-        { element: 'h1', popover: { title: 'Work Zone Intake Form', description: 'This form sends work zone reports to the live SapioWZDX feed. Navigation apps and transportation agencies read this feed in real time. This tour covers every field.', position: 'bottom' } },
-        { element: 'input[name="road_name"]', popover: { title: 'Road Name', description: 'Enter the road where work is happening. Be specific: I-459 N or Oak Street at 5th Ave is more useful than just saying the highway.', position: 'bottom' } },
-        { element: 'select[name="direction"]', popover: { title: 'Direction of Travel', description: 'Which direction is affected? This is the direction drivers are traveling through the work zone, not the direction you are facing.', position: 'bottom' } },
-        { element: 'select[name="location_method"]', popover: { title: 'How Was the Extent Determined?', description: 'Channel devices means you placed cones or barrels to mark the zone. Use Reference signs if you measured from posted mile markers or cross-streets.', position: 'bottom' } },
-        { element: '#map', popover: { title: 'Mark the Work Zone on the Map', description: 'Tap Set start point, then click the map where the work zone begins. Switch to Set end point and click where it ends. Drag either pin to fine-tune.', position: 'top' } },
-        { element: 'input[name="start_date"]', popover: { title: 'When Did the Work Zone Start?', description: 'Enter the date and time the work zone opened, or when it is scheduled to open. If it is already active, use right now.', position: 'bottom' } },
-        { element: 'input[name="end_date"]', popover: { title: 'End Time (Optional)', description: 'Leave this blank if there is no set end time. You can close the event later using the Mark event complete section at the bottom of this page.', position: 'bottom' } },
-        { element: 'select[name="vehicle_impact"]', popover: { title: 'How Is Traffic Affected?', description: 'Some lanes closed covers most work zones. Use All lanes closed for a full road shutdown, or Alternating one-way if you are flagging traffic through.', position: 'top' } },
-        { element: 'button[type="submit"]', popover: { title: 'Publish to the Feed', description: 'When everything looks right, tap this. The report goes live within seconds and appears at sapiowzdx.com/feed.', position: 'top' } },
-        { element: '#loadEventsBtn', popover: { title: 'Closing a Work Zone', description: 'When the crew wraps up, tap Load active events, select your event, and tap Mark Complete. The report is closed and the feed updates automatically.', position: 'top' } }
-      ]);
-      driverObj.start();
-    }
-
+  });
+  document.getElementById('tour-btn').addEventListener('click', () => {
+    document.getElementById('settings-panel').style.display = 'none';
+    setTimeout(startTour, 0);
   });
 
-</script>
+  // ---- First-visit badge ----
+  if (!localStorage.getItem('wzdx_tour_seen')) {
+    setTimeout(() => { document.getElementById('tour-badge').style.display = 'flex'; }, 800);
+  }
+  document.getElementById('tour-badge').addEventListener('click', () => {
+    document.getElementById('tour-badge').style.display = 'none';
+    setTimeout(startTour, 0);
+  });
+  document.getElementById('badge-dismiss').addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('tour-badge').style.display = 'none';
+    localStorage.setItem('wzdx_tour_seen', '1');
+  });
 
-<!-- Settings panel + tour badge -->
-<button id="settings-btn" aria-label="Settings" title="Settings">&#9881;</button>
-<div id="settings-panel" role="dialog">
-  <div class="sp-header">
-    <span>Settings</span>
-    <button id="settings-close">&#x2715;</button>
-  </div>
-  <button id="tour-btn" class="sp-tour-btn">&#127919; Take the tour</button>
-  <p class="sp-hint">A quick walkthrough of every field &#8212; helpful for first-time crew.</p>
-  <div id="setupLinkPanel" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">
-    <p style="font-weight:600;font-size:0.88rem;margin:0 0 3px;">Generate setup link</p>
-    <p style="font-size:0.78rem;color:#888;margin:0 0 8px;">Supervisor only &#8212; crew scans once and the key saves automatically.</p>
-    <div class="setup-link-row">
-      <input type="text" id="setupLinkInput" readonly style="font-size:0.7rem;min-width:0;">
-      <button type="button" id="copySetupLink" class="secondary" style="white-space:nowrap;flex-shrink:0;font-size:0.78rem;padding:5px 8px;">Copy</button>
-    </div>
-    <div id="setupQR" style="text-align:center;padding:4px 0;"></div>
-  </div>
-</div>
-<div id="tour-badge" role="button" tabindex="0">
-  New here? Take the tour
-  <button id="badge-dismiss">&#x2715;</button>
-</div>
+  // ---- Guided tour ----
+  function startTour() {
+    var driverObj = new Driver({
+      animate: true, opacity: 0.75, padding: 8, allowClose: true,
+      doneBtnText: 'Done', closeBtnText: 'Skip tour',
+      nextBtnText: 'Next \u2192', prevBtnText: '\u2190 Back',
+      onReset: function () { localStorage.setItem('wzdx_tour_seen', '1'); },
+    });
+    driverObj.defineSteps([
+      { element: 'h1', popover: { title: 'Work Zone Intake Form', description: 'This form sends work zone reports to the live SapioWZDX feed. Navigation apps and transportation agencies read this feed in real time. This tour covers every field.', position: 'bottom' } },
+      { element: 'input[name="road_name"]', popover: { title: 'Road Name', description: 'Enter the road where work is happening. Be specific: I-459 N or Oak Street at 5th Ave is more useful than just the highway name.', position: 'bottom' } },
+      { element: 'select[name="direction"]', popover: { title: 'Direction of Travel', description: 'Which direction is affected? This is the direction drivers travel through the work zone, not the direction you are facing.', position: 'bottom' } },
+      { element: 'select[name="location_method"]', popover: { title: 'How Was the Extent Determined?', description: 'Channel devices means you placed cones or barrels to mark the zone. Use Reference signs if you measured from posted mile markers or cross-streets.', position: 'bottom' } },
+      { element: '#map', popover: { title: 'Mark the Work Zone on the Map', description: 'Tap Set start point, then click the map where the work zone begins. Switch to Set end point and click where it ends. Drag either pin to fine-tune.', position: 'top' } },
+      { element: 'input[name="start_date"]', popover: { title: 'When Did the Work Zone Start?', description: 'Enter the date and time the work zone opened, or when it is scheduled to open. If already active, use right now.', position: 'bottom' } },
+      { element: 'input[name="end_date"]', popover: { title: 'End Time (Optional)', description: 'Leave blank if there is no set end time. You can close the event later using the Mark event complete section below.', position: 'bottom' } },
+      { element: 'select[name="vehicle_impact"]', popover: { title: 'How Is Traffic Affected?', description: 'Some lanes closed covers most work zones. Use All lanes closed for a full road shutdown, or Alternating one-way if you are flagging traffic through.', position: 'top' } },
+      { element: 'button[type="submit"]', popover: { title: 'Publish to the Feed', description: 'When everything looks right, tap this. The report goes live within seconds and appears at sapiowzdx.com/feed.', position: 'top' } },
+      { element: '#loadEventsBtn', popover: { title: 'Closing a Work Zone', description: 'When the crew wraps up, tap Load active events, select your event, and tap Mark Complete. The report is closed and the feed updates automatically.', position: 'top' } },
+    ]);
+    driverObj.start();
+  }
+</script>
 </body>
 </html>
