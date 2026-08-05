@@ -248,7 +248,7 @@
 })();
 
 // ── State ──────────────────────────────────────────────────────────────────
-let markers      = [];   // [{ latlng, leafletMarker, accuracyCircle }]
+let markers      = [];
 let polyline     = null;
 let obstructionType = 'construction';
 let durationType    = 'short-term';
@@ -262,10 +262,6 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
 }).addTo(map);
 
-// Best-effort center on user position without blocking.
-// Uses permissions.query so we only call getCurrentPosition if permission is
-// already granted — avoids triggering the OS dialog at page load, which can
-// leave Android in a cached "denied" state before the user taps Drop Marker.
 (async () => {
   if (!navigator.geolocation) return;
   try {
@@ -276,12 +272,10 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         () => {}
       );
     }
-    // If the user later grants permission in Settings, clear any denial message.
     perm.onchange = () => {
       if (perm.state === 'granted') clearResult();
     };
   } catch (_) {
-    // permissions.query not supported — fall back to silent attempt
     navigator.geolocation.getCurrentPosition(
       (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 16),
       () => {}
@@ -290,7 +284,6 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 })();
 
 function makeMarkerIcon(n) {
-  // Numbered circle icon — hardcoded color, CSS vars don't work in divIcon HTML
   return L.divIcon({
     className: '',
     html: `<div style="background:#c1440e;color:white;width:26px;height:26px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:sans-serif">${n}</div>`,
@@ -337,13 +330,13 @@ document.getElementById('drop-btn').addEventListener('click', () => {
 
   const btn = document.getElementById('drop-btn');
   btn.disabled = true;
-  btn.textContent = '⌛ Getting GPS…';
+  btn.textContent = '\u231B Getting GPS\u2026';
 
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      clearResult(); // clear any stale denial or timeout message
+      clearResult();
       const latlng   = L.latLng(pos.coords.latitude, pos.coords.longitude);
-      const accuracy = pos.coords.accuracy; // metres
+      const accuracy = pos.coords.accuracy;
 
       const n = markers.length + 1;
       const leafletMarker = L.marker(latlng, { icon: makeMarkerIcon(n) }).addTo(map);
@@ -361,16 +354,15 @@ document.getElementById('drop-btn').addEventListener('click', () => {
       document.getElementById('marker-count').textContent =
         `${markers.length} marker${markers.length !== 1 ? 's' : ''} placed`;
       document.getElementById('accuracy-display').textContent =
-        `±${Math.round(accuracy)} m`;
+        `\u00B1${Math.round(accuracy)} m`;
 
       map.panTo(latlng);
       document.getElementById('undo-btn').disabled = false;
       updatePublishState();
 
       btn.disabled = false;
-      btn.textContent = '📍 Drop Marker';
+      btn.textContent = '\uD83D\uDCCD Drop Marker';
 
-      // OSM lookup fires once on first marker only
       if (!osmQueried) {
         osmQueried = true;
         queryOSM(pos.coords.latitude, pos.coords.longitude);
@@ -378,20 +370,18 @@ document.getElementById('drop-btn').addEventListener('click', () => {
     },
     (err) => {
       if (err.code === 1) {
-        // Permission denied — show message with inline Retry link so the user
-        // can try again after granting access in Settings without reloading.
         showResultWithRetry(
-          'Location access denied — enable location permissions in Settings, then tap '
+          'Location access denied \u2014 enable location permissions in Settings, then tap '
         );
       } else {
         const msgs = {
-          2: 'Location unavailable — move to an area with better GPS signal and try again.',
-          3: 'Location request timed out — try again.',
+          2: 'Location unavailable \u2014 move to an area with better GPS signal and try again.',
+          3: 'Location request timed out \u2014 try again.',
         };
         showResult('err', msgs[err.code] || `Location error (code ${err.code}).`);
       }
       btn.disabled = false;
-      btn.textContent = '📍 Drop Marker';
+      btn.textContent = '\uD83D\uDCCD Drop Marker';
     },
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
   );
@@ -414,7 +404,6 @@ document.getElementById('undo-btn').addEventListener('click', () => {
 });
 
 // ── OSM Overpass lookup ────────────────────────────────────────────────────
-// Queries once per session on first marker drop. Fails silently on any error.
 async function queryOSM(lat, lng) {
   const query =
     `[out:json][timeout:10];` +
@@ -457,7 +446,6 @@ async function queryOSM(lat, lng) {
     }
   } catch (_) {
     clearTimeout(timer);
-    // Silently ignore — crew fills in manually
   }
 }
 
@@ -466,7 +454,7 @@ function parseMaxspeedToKph(maxspeed) {
   if (mphMatch) return Math.round(parseFloat(mphMatch[1]) * 1.60934);
   const numMatch = maxspeed.match(/^(\d+(?:\.\d+)?)(?:\s*km\/h)?$/i);
   if (numMatch) return parseInt(numMatch[1], 10);
-  return null; // "national", "urban", "rural" — ignore
+  return null;
 }
 
 // ── API key (localStorage) ─────────────────────────────────────────────────
@@ -483,10 +471,12 @@ document.getElementById('apiKeyToggle').addEventListener('click', () => {
   p.style.display = p.style.display === 'none' ? 'block' : 'none';
 });
 
-// ── Setup link + QR code generator ────────────────────────────────────────────
+// ── Setup link + QR code generator ────────────────────────────────────────
+// Null-guards against #setupLinkPanel living after </script> in HTML.
 function renderSetupLink() {
-  var key = localStorage.getItem('wzdx_api_key');
   var panel = document.getElementById('setupLinkPanel');
+  if (!panel) return;
+  var key = localStorage.getItem('wzdx_api_key');
   if (!key) { panel.style.display = 'none'; return; }
   var url = window.location.origin + window.location.pathname + '?setup=' + encodeURIComponent(key);
   document.getElementById('setupLinkInput').value = url;
@@ -494,29 +484,6 @@ function renderSetupLink() {
   var qrDiv = document.getElementById('setupQR');
   qrDiv.innerHTML = '';
   new QRCode(qrDiv, { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
-}
-
-document.getElementById('copySetupLink').addEventListener('click', () => {
-  navigator.clipboard.writeText(document.getElementById('setupLinkInput').value).then(() => {
-    var btn = document.getElementById('copySetupLink');
-    var orig = btn.textContent;
-    btn.textContent = 'Copied!';
-    setTimeout(() => { btn.textContent = orig; }, 2000);
-  });
-});
-
-renderSetupLink(); // run on load — shows panel if key already saved
-
-// Provisioning confirmation banner (auto-dismisses after 3.5s)
-if (window.__wzdxProvisioned) {
-  var b = document.createElement('div');
-  b.textContent = '✓ Device provisioned — API key saved.';
-  b.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);'
-    + 'background:#2e7d32;color:white;padding:10px 22px;border-radius:8px;'
-    + 'font-size:0.9rem;z-index:9999;box-shadow:0 2px 10px rgba(0,0,0,.25);'
-    + 'white-space:nowrap;transition:opacity 0.6s ease';
-  document.body.appendChild(b);
-  setTimeout(() => { b.style.opacity = '0'; setTimeout(() => b.remove(), 700); }, 3500);
 }
 
 // ── Publish ────────────────────────────────────────────────────────────────
@@ -565,12 +532,12 @@ document.getElementById('publish-btn').addEventListener('click', async () => {
       showResult('ok',
         `Saved. Event ID: ${data.id}\n` +
         (isIncident
-          ? 'Stored internally — not published to the WZDx feed.'
+          ? 'Stored internally \u2014 not published to the WZDx feed.'
           : 'Published to /feed.')
       );
       resetForm();
     } else if (res.status === 401) {
-      showResult('err', 'API key required — tap "\uD83D\uDD11 API key" above to enter your key.');
+      showResult('err', 'API key required \u2014 tap "\uD83D\uDD11 API key" above to enter your key.');
       document.getElementById('apiKeyPanel').style.display = 'block';
     } else {
       showResult('err', 'Errors:\n' + (data.errors || [data.error]).join('\n'));
@@ -614,7 +581,6 @@ function showResult(cls, msg) {
   el.textContent = msg;
 }
 
-// Shows an error with an inline "Retry" link that re-triggers Drop Marker.
 function showResultWithRetry(msg) {
   const el = document.getElementById('result');
   el.style.display = 'block';
@@ -630,68 +596,97 @@ function showResultWithRetry(msg) {
   });
   el.appendChild(link);
 }
+
+// ── Elements living after </script> — wire up via DOMContentLoaded ─────────
+// (#settings-btn, #settings-panel, #setupLinkPanel, #copySetupLink,
+//  #tour-badge, #badge-dismiss are all in HTML below the </script> tag.)
 document.addEventListener('DOMContentLoaded', function () {
 
-    // ---- Settings panel ----
-    document.getElementById('settings-btn').addEventListener('click', function () {
-      var panel = document.getElementById('settings-panel');
-      panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
-      document.getElementById('tour-badge').style.display = 'none';
-      if (panel.style.display === 'block') renderSetupLink();
-    });
-    document.getElementById('settings-close').addEventListener('click', function () {
-      document.getElementById('settings-panel').style.display = 'none';
-    });
-    document.addEventListener('click', function (e) {
-      var panel = document.getElementById('settings-panel');
-      var btn   = document.getElementById('settings-btn');
-      if (panel.style.display === 'block' && !panel.contains(e.target) && !btn.contains(e.target)) {
-        panel.style.display = 'none';
-      }
-    });
-    document.getElementById('tour-btn').addEventListener('click', function () {
-      document.getElementById('settings-panel').style.display = 'none';
-      setTimeout(startTour, 0);
-    });
+  // Panel is in DOM now — do initial render
+  renderSetupLink();
 
-    // ---- First-visit badge ----
-    if (!localStorage.getItem('wzdx_tour_seen')) {
-      setTimeout(function () {
-        document.getElementById('tour-badge').style.display = 'flex';
-      }, 800);
-    }
-    document.getElementById('tour-badge').addEventListener('click', function () {
-      document.getElementById('tour-badge').style.display = 'none';
-      setTimeout(startTour, 0);
+  // Copy-to-clipboard for the setup link
+  document.getElementById('copySetupLink').addEventListener('click', function () {
+    navigator.clipboard.writeText(document.getElementById('setupLinkInput').value).then(function () {
+      var btn = document.getElementById('copySetupLink');
+      var orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(function () { btn.textContent = orig; }, 2000);
     });
-    document.getElementById('badge-dismiss').addEventListener('click', function (e) {
-      e.stopPropagation();
-      document.getElementById('tour-badge').style.display = 'none';
-      localStorage.setItem('wzdx_tour_seen', '1');
-    });
+  });
 
-    // ---- Guided tour ----
-    function startTour() {
-      var driverObj = new Driver({
-        animate: true, opacity: 0.75, padding: 8, allowClose: true,
-        doneBtnText: 'Done', closeBtnText: 'Skip tour',
-        nextBtnText: 'Next →', prevBtnText: '← Back',
-        onReset: function () { localStorage.setItem('wzdx_tour_seen', '1'); }
-      });
-      driverObj.defineSteps([
-        { element: 'h1', popover: { title: 'Field Capture Mode', description: 'This page is built for phones. Walk the work zone and drop GPS markers as you go. No map-clicking needed. This tour walks you through the whole process.', position: 'bottom' } },
-        { element: '.type-grid', popover: { title: 'What Kind of Event Is This?', description: 'Pick the type that best fits. Construction and Road Maintenance go to the public WZDx feed. Traffic incidents and EMS calls are saved for your records but not published.', position: 'bottom' } },
-        { element: '.dur-row', popover: { title: 'How Long Will It Last?', description: 'Short-term means the work wraps up within the day. Long-term is multi-day. This affects how the event is labeled in the feed.', position: 'bottom' } },
-        { element: '#road_name', popover: { title: 'Road Name', description: 'Type the name of the road. Keep it simple like Oak Street or SR-150 so dispatchers and navigation apps can identify it.', position: 'bottom' } },
-        { element: '#direction', popover: { title: 'Direction of Travel Affected', description: 'Which direction are drivers traveling through the work zone? Pick the direction of the lanes that are impacted.', position: 'bottom' } },
-        { element: '#map', popover: { title: 'Live Map', description: 'The map shows your current position and every marker you have dropped. You do not need to tap on it directly. Just walk the area and use the Drop Marker button.', position: 'top' } },
-        { element: '#drop-btn', popover: { title: 'Drop Marker', description: 'Tap this button as you walk the perimeter of the work zone. Each tap records your current GPS position. Drop at least 3 markers to define the area.', position: 'top' } },
-        { element: '#undo-btn', popover: { title: 'Undo Last Marker', description: 'Dropped a marker in the wrong spot? Tap Undo to remove the last one and try again.', position: 'top' } },
-        { element: '#vehicle_impact', popover: { title: 'Traffic Impact and Details', description: 'Set how traffic is affected. Fill in total lanes and reduced speed limit if you know them. Those details make the feed more useful for navigation apps.', position: 'top' } },
-        { element: '#publish-btn', popover: { title: 'Publish When Ready', description: 'Once you have dropped at least 3 markers and filled in the road name, this button activates. Tap it to send the report live to the WZDx feed.', position: 'top' } }
-      ]);
-      driverObj.start();
+  // Provisioning confirmation banner (auto-dismisses after 3.5 s)
+  if (window.__wzdxProvisioned) {
+    var b = document.createElement('div');
+    b.textContent = '\u2713 Device provisioned \u2014 API key saved.';
+    b.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);'
+      + 'background:#2e7d32;color:white;padding:10px 22px;border-radius:8px;'
+      + 'font-size:0.9rem;z-index:9999;box-shadow:0 2px 10px rgba(0,0,0,.25);'
+      + 'white-space:nowrap;transition:opacity 0.6s ease';
+    document.body.appendChild(b);
+    setTimeout(function () { b.style.opacity = '0'; setTimeout(function () { b.remove(); }, 700); }, 3500);
+  }
+
+  // ---- Settings panel ----
+  document.getElementById('settings-btn').addEventListener('click', function () {
+    var panel = document.getElementById('settings-panel');
+    panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+    document.getElementById('tour-badge').style.display = 'none';
+    if (panel.style.display === 'block') renderSetupLink();
+  });
+  document.getElementById('settings-close').addEventListener('click', function () {
+    document.getElementById('settings-panel').style.display = 'none';
+  });
+  document.addEventListener('click', function (e) {
+    var panel = document.getElementById('settings-panel');
+    var btn   = document.getElementById('settings-btn');
+    if (panel.style.display === 'block' && !panel.contains(e.target) && !btn.contains(e.target)) {
+      panel.style.display = 'none';
     }
+  });
+  document.getElementById('tour-btn').addEventListener('click', function () {
+    document.getElementById('settings-panel').style.display = 'none';
+    setTimeout(startTour, 0);
+  });
+
+  // ---- First-visit badge ----
+  if (!localStorage.getItem('wzdx_tour_seen')) {
+    setTimeout(function () {
+      document.getElementById('tour-badge').style.display = 'flex';
+    }, 800);
+  }
+  document.getElementById('tour-badge').addEventListener('click', function () {
+    document.getElementById('tour-badge').style.display = 'none';
+    setTimeout(startTour, 0);
+  });
+  document.getElementById('badge-dismiss').addEventListener('click', function (e) {
+    e.stopPropagation();
+    document.getElementById('tour-badge').style.display = 'none';
+    localStorage.setItem('wzdx_tour_seen', '1');
+  });
+
+  // ---- Guided tour ----
+  function startTour() {
+    var driverObj = new Driver({
+      animate: true, opacity: 0.75, padding: 8, allowClose: true,
+      doneBtnText: 'Done', closeBtnText: 'Skip tour',
+      nextBtnText: 'Next \u2192', prevBtnText: '\u2190 Back',
+      onReset: function () { localStorage.setItem('wzdx_tour_seen', '1'); }
+    });
+    driverObj.defineSteps([
+      { element: 'h1', popover: { title: 'Field Capture Mode', description: 'This page is built for phones. Walk the work zone and drop GPS markers as you go. No map-clicking needed. This tour walks you through the whole process.', position: 'bottom' } },
+      { element: '.type-grid', popover: { title: 'What Kind of Event Is This?', description: 'Pick the type that best fits. Construction and Road Maintenance go to the public WZDx feed. Traffic incidents and EMS calls are saved for your records but not published.', position: 'bottom' } },
+      { element: '.dur-row', popover: { title: 'How Long Will It Last?', description: 'Short-term means the work wraps up within the day. Long-term is multi-day. This affects how the event is labeled in the feed.', position: 'bottom' } },
+      { element: '#road_name', popover: { title: 'Road Name', description: 'Type the name of the road. Keep it simple like Oak Street or SR-150 so dispatchers and navigation apps can identify it.', position: 'bottom' } },
+      { element: '#direction', popover: { title: 'Direction of Travel Affected', description: 'Which direction are drivers traveling through the work zone? Pick the direction of the lanes that are impacted.', position: 'bottom' } },
+      { element: '#map', popover: { title: 'Live Map', description: 'The map shows your current position and every marker you have dropped. You do not need to tap on it directly. Just walk the area and use the Drop Marker button.', position: 'top' } },
+      { element: '#drop-btn', popover: { title: 'Drop Marker', description: 'Tap this button as you walk the perimeter of the work zone. Each tap records your current GPS position. Drop at least 3 markers to define the area.', position: 'top' } },
+      { element: '#undo-btn', popover: { title: 'Undo Last Marker', description: 'Dropped a marker in the wrong spot? Tap Undo to remove the last one and try again.', position: 'top' } },
+      { element: '#vehicle_impact', popover: { title: 'Traffic Impact and Details', description: 'Set how traffic is affected. Fill in total lanes and reduced speed limit if you know them. Those details make the feed more useful for navigation apps.', position: 'top' } },
+      { element: '#publish-btn', popover: { title: 'Publish When Ready', description: 'Once you have dropped at least 3 markers and filled in the road name, this button activates. Tap it to send the report live to the WZDx feed.', position: 'top' } }
+    ]);
+    driverObj.start();
+  }
 
 });
 
