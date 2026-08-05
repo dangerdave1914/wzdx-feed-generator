@@ -5,6 +5,7 @@
 <title>Field Capture</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/driver.js/0.9.8/driver.min.css">
 <style>
   :root { --ink:#1a1a1a; --line:#d8d8d2; --accent:#c1440e; --green:#2e7d32; --bg:#faf9f6; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -98,6 +99,41 @@
   .sl-label { font-size:0.82rem;font-weight:600;margin:0 0 6px;color:#444; }
   .setup-link-row { display:flex;gap:8px;align-items:center;margin-bottom:10px; }
   .setup-link-row input[type=text] { font-family:monospace;font-size:0.73rem;color:#444;padding:9px 10px;border:1px solid #d8d8d2;border-radius:6px;background:white; }
+
+  /* ---- Settings panel + tour badge ---- */
+  #settings-btn {
+    position:fixed;top:12px;right:12px;z-index:1000;
+    width:36px;height:36px;border-radius:50%;
+    background:white;border:1px solid var(--line);
+    box-shadow:0 1px 5px rgba(0,0,0,.15);
+    font-size:17px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  #settings-panel {
+    display:none;position:fixed;top:56px;right:12px;z-index:1000;
+    background:white;border:1px solid var(--line);border-radius:10px;
+    padding:14px 16px;min-width:210px;
+    box-shadow:0 4px 18px rgba(0,0,0,.15);
+  }
+  .sp-header { display:flex;justify-content:space-between;align-items:center;margin-bottom:12px; }
+  .sp-header span { font-weight:600;font-size:0.9rem; }
+  .sp-header button { background:none;border:none;cursor:pointer;color:#888;font-size:1rem;padding:0; }
+  .sp-tour-btn {
+    width:100%;padding:9px 12px;background:var(--accent);color:white;
+    border:none;border-radius:6px;font-size:0.88rem;cursor:pointer;text-align:left;
+  }
+  .sp-hint { font-size:0.78rem;color:#888;margin:8px 0 0; }
+  #tour-badge {
+    display:none;position:fixed;top:56px;right:12px;z-index:999;
+    background:#1a1a1a;color:white;padding:9px 12px 9px 14px;
+    border-radius:8px;font-size:0.82rem;cursor:pointer;
+    box-shadow:0 2px 10px rgba(0,0,0,.25);
+    align-items:center;gap:10px;
+  }
+  #tour-badge button {
+    background:none;border:none;color:rgba(255,255,255,.65);
+    cursor:pointer;font-size:1rem;padding:0;line-height:1;
+  }
 </style>
 </head>
 <body>
@@ -208,6 +244,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/driver.js/0.9.8/driver.min.js"></script>
 <script>
 // ── Device provisioning via ?setup=<KEY> ──────────────────────────────────────────────────────
 (function () {
@@ -603,6 +640,81 @@ function showResultWithRetry(msg) {
   });
   el.appendChild(link);
 }
+  // ---- Settings panel ----
+  document.getElementById('settings-btn').addEventListener('click', function () {
+    var panel = document.getElementById('settings-panel');
+    panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+    document.getElementById('tour-badge').style.display = 'none';
+  });
+  document.getElementById('settings-close').addEventListener('click', function () {
+    document.getElementById('settings-panel').style.display = 'none';
+  });
+  document.addEventListener('click', function (e) {
+    var panel = document.getElementById('settings-panel');
+    var btn   = document.getElementById('settings-btn');
+    if (panel.style.display === 'block' && !panel.contains(e.target) && !btn.contains(e.target)) {
+      panel.style.display = 'none';
+    }
+  });
+  document.getElementById('tour-btn').addEventListener('click', function () {
+    document.getElementById('settings-panel').style.display = 'none';
+    startTour();
+  });
+
+  // ---- First-visit badge ----
+  if (!localStorage.getItem('wzdx_tour_seen')) {
+    setTimeout(function () {
+      document.getElementById('tour-badge').style.display = 'flex';
+    }, 800);
+  }
+  document.getElementById('tour-badge').addEventListener('click', function () {
+    document.getElementById('tour-badge').style.display = 'none';
+    startTour();
+  });
+  document.getElementById('badge-dismiss').addEventListener('click', function (e) {
+    e.stopPropagation();
+    document.getElementById('tour-badge').style.display = 'none';
+    localStorage.setItem('wzdx_tour_seen', '1');
+  });
+
+  // ---- Guided tour ----
+  function startTour() {
+    var driverObj = new Driver({
+      animate: true, opacity: 0.75, padding: 8, allowClose: true,
+      doneBtnText: 'Done', closeBtnText: 'Skip tour',
+      nextBtnText: 'Next →', prevBtnText: '← Back',
+      onReset: function () { localStorage.setItem('wzdx_tour_seen', '1'); }
+    });
+    driverObj.defineSteps([
+      { popover: { title: 'Field Capture Mode', description: 'This page is built for phones. Walk the work zone and drop GPS markers as you go. No map-clicking needed. This tour walks you through the whole process.', position: 'mid-center' } },
+      { element: '.type-grid', popover: { title: 'What Kind of Event Is This?', description: 'Pick the type that best fits. Construction and Road Maintenance go to the public WZDx feed. Traffic incidents and EMS calls are saved for your records but not published.', position: 'bottom' } },
+      { element: '.dur-row', popover: { title: 'How Long Will It Last?', description: 'Short-term means the work wraps up within the day. Long-term is multi-day. This affects how the event is labeled in the feed.', position: 'bottom' } },
+      { element: '#road_name', popover: { title: 'Road Name', description: 'Type the name of the road. Keep it simple like Oak Street or SR-150 so dispatchers and navigation apps can identify it.', position: 'bottom' } },
+      { element: '#direction', popover: { title: 'Direction of Travel Affected', description: 'Which direction are drivers traveling through the work zone? Pick the direction of the lanes that are impacted.', position: 'bottom' } },
+      { element: '#map', popover: { title: 'Live Map', description: 'The map shows your current position and every marker you have dropped. You do not need to tap on it directly. Just walk the area and use the Drop Marker button.', position: 'top' } },
+      { element: '#drop-btn', popover: { title: 'Drop Marker', description: 'Tap this button as you walk the perimeter of the work zone. Each tap records your current GPS position. Drop at least 3 markers to define the area.', position: 'top' } },
+      { element: '#undo-btn', popover: { title: 'Undo Last Marker', description: 'Dropped a marker in the wrong spot? Tap Undo to remove the last one and try again.', position: 'top' } },
+      { element: '#vehicle_impact', popover: { title: 'Traffic Impact and Details', description: 'Set how traffic is affected. Fill in total lanes and reduced speed limit if you know them. Those details make the feed more useful for navigation apps.', position: 'top' } },
+      { element: '#publish-btn', popover: { title: 'Publish When Ready', description: 'Once you have dropped at least 3 markers and filled in the road name, this button activates. Tap it to send the report live to the WZDx feed.', position: 'top' } }
+    ]);
+    driverObj.start();
+  }
+
 </script>
+
+<!-- Settings panel + tour badge -->
+<button id="settings-btn" aria-label="Settings" title="Settings">&#9881;</button>
+<div id="settings-panel" role="dialog">
+  <div class="sp-header">
+    <span>Settings</span>
+    <button id="settings-close">&#x2715;</button>
+  </div>
+  <button id="tour-btn" class="sp-tour-btn">&#127919; Take the tour</button>
+  <p class="sp-hint">A quick walkthrough of every field &#8212; helpful for first-time crew.</p>
+</div>
+<div id="tour-badge" role="button" tabindex="0">
+  New here? Take the tour
+  <button id="badge-dismiss">&#x2715;</button>
+</div>
 </body>
 </html>
