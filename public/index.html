@@ -550,65 +550,69 @@
       resultDiv.textContent = 'Request failed: ' + err.message;
     }
   });
-  // ---- Settings panel ----
-  document.getElementById('settings-btn').addEventListener('click', function () {
-    var panel = document.getElementById('settings-panel');
-    panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
-    document.getElementById('tour-badge').style.display = 'none';
-  });
-  document.getElementById('settings-close').addEventListener('click', function () {
-    document.getElementById('settings-panel').style.display = 'none';
-  });
-  document.addEventListener('click', function (e) {
-    var panel = document.getElementById('settings-panel');
-    var btn   = document.getElementById('settings-btn');
-    if (panel.style.display === 'block' && !panel.contains(e.target) && !btn.contains(e.target)) {
-      panel.style.display = 'none';
-    }
-  });
-  document.getElementById('tour-btn').addEventListener('click', function () {
-    document.getElementById('settings-panel').style.display = 'none';
-    startTour();
-  });
+document.addEventListener('DOMContentLoaded', function () {
 
-  // ---- First-visit badge ----
-  if (!localStorage.getItem('wzdx_tour_seen')) {
-    setTimeout(function () {
-      document.getElementById('tour-badge').style.display = 'flex';
-    }, 800);
-  }
-  document.getElementById('tour-badge').addEventListener('click', function () {
-    document.getElementById('tour-badge').style.display = 'none';
-    startTour();
-  });
-  document.getElementById('badge-dismiss').addEventListener('click', function (e) {
-    e.stopPropagation();
-    document.getElementById('tour-badge').style.display = 'none';
-    localStorage.setItem('wzdx_tour_seen', '1');
-  });
-
-  // ---- Guided tour ----
-  function startTour() {
-    var driverObj = new Driver({
-      animate: true, opacity: 0.75, padding: 8, allowClose: true,
-      doneBtnText: 'Done', closeBtnText: 'Skip tour',
-      nextBtnText: 'Next →', prevBtnText: '← Back',
-      onReset: function () { localStorage.setItem('wzdx_tour_seen', '1'); }
+    // ---- Settings panel ----
+    document.getElementById('settings-btn').addEventListener('click', function () {
+      var panel = document.getElementById('settings-panel');
+      panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+      document.getElementById('tour-badge').style.display = 'none';
     });
-    driverObj.defineSteps([
-      { popover: { title: 'Work Zone Intake Form', description: 'This form sends work zone reports to the live SapioWZDX feed. Navigation apps and transportation agencies read this feed in real time. This tour covers every field.', position: 'mid-center' } },
-      { element: 'input[name=\"road_name\"]', popover: { title: 'Road Name', description: 'Enter the road where work is happening. Be specific: I-459 N or Oak Street at 5th Ave is more useful than just saying the highway.', position: 'bottom' } },
-      { element: 'select[name=\"direction\"]', popover: { title: 'Direction of Travel', description: 'Which direction is affected? This is the direction drivers are traveling through the work zone, not the direction you are facing.', position: 'bottom' } },
-      { element: 'select[name=\"location_method\"]', popover: { title: 'How Was the Extent Determined?', description: 'Channel devices means you placed cones or barrels to mark the zone. Use Reference signs if you measured from posted mile markers or cross-streets.', position: 'bottom' } },
-      { element: '#map', popover: { title: 'Mark the Work Zone on the Map', description: 'Tap Set start point, then click the map where the work zone begins. Switch to Set end point and click where it ends. Drag either pin to fine-tune.', position: 'top' } },
-      { element: 'input[name=\"start_date\"]', popover: { title: 'When Did the Work Zone Start?', description: 'Enter the date and time the work zone opened, or when it is scheduled to open. If it is already active, use right now.', position: 'bottom' } },
-      { element: 'input[name=\"end_date\"]', popover: { title: 'End Time (Optional)', description: 'Leave this blank if there is no set end time. You can close the event later using the Mark event complete section at the bottom of this page.', position: 'bottom' } },
-      { element: 'select[name=\"vehicle_impact\"]', popover: { title: 'How Is Traffic Affected?', description: 'Some lanes closed covers most work zones. Use All lanes closed for a full road shutdown, or Alternating one-way if you are flagging traffic through.', position: 'top' } },
-      { element: 'button[type=\"submit\"]', popover: { title: 'Publish to the Feed', description: 'When everything looks right, tap this. The report goes live within seconds and appears at sapiowzdx.com/feed.', position: 'top' } },
-      { element: '#loadEventsBtn', popover: { title: 'Closing a Work Zone', description: 'When the crew wraps up, tap Load active events, select your event, and tap Mark Complete. The report is closed and the feed updates automatically.', position: 'top' } }
-    ]);
-    driverObj.start();
-  }
+    document.getElementById('settings-close').addEventListener('click', function () {
+      document.getElementById('settings-panel').style.display = 'none';
+    });
+    document.addEventListener('click', function (e) {
+      var panel = document.getElementById('settings-panel');
+      var btn   = document.getElementById('settings-btn');
+      if (panel.style.display === 'block' && !panel.contains(e.target) && !btn.contains(e.target)) {
+        panel.style.display = 'none';
+      }
+    });
+    document.getElementById('tour-btn').addEventListener('click', function () {
+      document.getElementById('settings-panel').style.display = 'none';
+      startTour();
+    });
+
+    // ---- First-visit badge ----
+    if (!localStorage.getItem('wzdx_tour_seen')) {
+      setTimeout(function () {
+        document.getElementById('tour-badge').style.display = 'flex';
+      }, 800);
+    }
+    document.getElementById('tour-badge').addEventListener('click', function () {
+      document.getElementById('tour-badge').style.display = 'none';
+      startTour();
+    });
+    document.getElementById('badge-dismiss').addEventListener('click', function (e) {
+      e.stopPropagation();
+      document.getElementById('tour-badge').style.display = 'none';
+      localStorage.setItem('wzdx_tour_seen', '1');
+    });
+
+    // ---- Guided tour ----
+    function startTour() {
+      var driverObj = new Driver({
+        animate: true, opacity: 0.75, padding: 8, allowClose: true,
+        doneBtnText: 'Done', closeBtnText: 'Skip tour',
+        nextBtnText: 'Next →', prevBtnText: '← Back',
+        onReset: function () { localStorage.setItem('wzdx_tour_seen', '1'); }
+      });
+      driverObj.defineSteps([
+        { popover: { title: 'Work Zone Intake Form', description: 'This form sends work zone reports to the live SapioWZDX feed. Navigation apps and transportation agencies read this feed in real time. This tour covers every field.', position: 'mid-center' } },
+        { element: 'input[name=\"road_name\"]', popover: { title: 'Road Name', description: 'Enter the road where work is happening. Be specific: I-459 N or Oak Street at 5th Ave is more useful than just saying the highway.', position: 'bottom' } },
+        { element: 'select[name=\"direction\"]', popover: { title: 'Direction of Travel', description: 'Which direction is affected? This is the direction drivers are traveling through the work zone, not the direction you are facing.', position: 'bottom' } },
+        { element: 'select[name=\"location_method\"]', popover: { title: 'How Was the Extent Determined?', description: 'Channel devices means you placed cones or barrels to mark the zone. Use Reference signs if you measured from posted mile markers or cross-streets.', position: 'bottom' } },
+        { element: '#map', popover: { title: 'Mark the Work Zone on the Map', description: 'Tap Set start point, then click the map where the work zone begins. Switch to Set end point and click where it ends. Drag either pin to fine-tune.', position: 'top' } },
+        { element: 'input[name=\"start_date\"]', popover: { title: 'When Did the Work Zone Start?', description: 'Enter the date and time the work zone opened, or when it is scheduled to open. If it is already active, use right now.', position: 'bottom' } },
+        { element: 'input[name=\"end_date\"]', popover: { title: 'End Time (Optional)', description: 'Leave this blank if there is no set end time. You can close the event later using the Mark event complete section at the bottom of this page.', position: 'bottom' } },
+        { element: 'select[name=\"vehicle_impact\"]', popover: { title: 'How Is Traffic Affected?', description: 'Some lanes closed covers most work zones. Use All lanes closed for a full road shutdown, or Alternating one-way if you are flagging traffic through.', position: 'top' } },
+        { element: 'button[type=\"submit\"]', popover: { title: 'Publish to the Feed', description: 'When everything looks right, tap this. The report goes live within seconds and appears at sapiowzdx.com/feed.', position: 'top' } },
+        { element: '#loadEventsBtn', popover: { title: 'Closing a Work Zone', description: 'When the crew wraps up, tap Load active events, select your event, and tap Mark Complete. The report is closed and the feed updates automatically.', position: 'top' } }
+      ]);
+      driverObj.start();
+    }
+
+});
 
 </script>
 
