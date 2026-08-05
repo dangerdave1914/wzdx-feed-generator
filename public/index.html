@@ -570,7 +570,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.getElementById('tour-btn').addEventListener('click', function () {
       document.getElementById('settings-panel').style.display = 'none';
-      startTour();
+      setTimeout(startTour, 0);
     });
 
     // ---- First-visit badge ----
@@ -581,7 +581,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     document.getElementById('tour-badge').addEventListener('click', function () {
       document.getElementById('tour-badge').style.display = 'none';
-      startTour();
+      setTimeout(startTour, 0);
     });
     document.getElementById('badge-dismiss').addEventListener('click', function (e) {
       e.stopPropagation();
