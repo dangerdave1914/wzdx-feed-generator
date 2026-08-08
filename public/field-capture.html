@@ -564,7 +564,7 @@ document.getElementById('road_name').addEventListener('input', updatePublishStat
 document.getElementById('publish-btn').addEventListener('click', async () => {
   const roadName = document.getElementById('road_name').value.trim();
   if (!roadName) { showResult('err', 'Road name is required.'); return; }
-  if (markers.length < 3) { showResult('err', 'Drop at least 3 markers to define the perimeter.'); return; }
+  if (markers.length < 3) { showResult('err', 'Drop at least 3 markers to define the perimeter — you have ' + markers.length + '.'); return; }
 
   const totalLanesRaw = document.getElementById('total_lanes').value;
   const speedRaw      = document.getElementById('speed_kph').value;
